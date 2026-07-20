@@ -1,0 +1,12 @@
+.git
+.DS_Store
+.env
+.env.*
+.runtime
+.flattened-pom.xml
+target
+performance
+samples
+schemas
+scripts
+*.md

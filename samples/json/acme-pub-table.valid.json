@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "topic": "Acme/SB/PMNO-042/DATASCIENCE/JSON-v1/FromEqt/PUB_TABLE",
+    "timestamp": 1743436800000,
+    "message_id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "seq": 7
+  },
+  "data": {
+    "context": {
+      "project": "Precision",
+      "site": "SiteB",
+      "equipment_type": "Sensor-Array",
+      "line": "L1"
+    },
+    "table": [
+      {
+        "timestamp": 1743436800000,
+        "temperature_c": 23.5,
+        "humidity_pct": 45.2,
+        "vibration_mm_s": 0.12,
+        "pressure_bar": 1.013,
+        "status": "RUNNING"
+      },
+      {
+        "timestamp": 1743436801000,
+        "temperature_c": 23.6,
+        "humidity_pct": 45.1,
+        "vibration_mm_s": 0.15,
+        "pressure_bar": 1.014,
+        "status": "RUNNING"
+      },
+      {
+        "timestamp": 1743436802000,
+        "temperature_c": 24.1,
+        "humidity_pct": 44.8,
+        "vibration_mm_s": 0.89,
+        "pressure_bar": 1.012,
+        "status": "WARNING"
+      }
+    ]
+  }
+}

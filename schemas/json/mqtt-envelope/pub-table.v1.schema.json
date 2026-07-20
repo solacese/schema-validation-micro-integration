@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/mqtt-envelope/pub-table.v1.schema.json",
+  "title": "MQTT Envelope PUB_TABLE (v1)",
+  "version": "1.0.0",
+  "description": "Tabular-data message envelope. Carries one or more rows of named columns with flexible cell types.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "data"],
+  "properties": {
+    "metadata": {
+      "$ref": "https://example.com/schemas/mqtt-envelope/metadata.v1.schema.json"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["table"],
+      "properties": {
+        "context": {
+          "$ref": "https://example.com/schemas/mqtt-envelope/context.generic.v1.schema.json",
+          "default": {}
+        },
+        "table": {
+          "type": "array",
+          "minItems": 1,
+          "description": "One or more data rows. Column names and value types are project-specific.",
+          "items": { "$ref": "#/$defs/TableRow" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "CellValue": {
+      "description": "A single cell value. Accepts any scalar, object, or nested array.",
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string" },
+        { "type": "number" },
+        { "type": "boolean" },
+        { "type": "object" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/CellValue" }
+        }
+      ]
+    },
+    "TableRow": {
+      "type": "object",
+      "description": "A single data row. Property names are the column names; values must satisfy CellValue.",
+      "additionalProperties": { "$ref": "#/$defs/CellValue" }
+    }
+  }
+}

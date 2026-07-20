@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/mqtt-envelope/context.generic.v1.schema.json",
+  "title": "MQTT Envelope Generic Context (v1)",
+  "version": "1.0.0",
+  "type": "object",
+  "description": "Flexible business context object. Keys and value types are project-specific.",
+  "additionalProperties": {
+    "type": ["string", "number", "boolean", "null", "object", "array"]
+  },
+  "default": {}
+}

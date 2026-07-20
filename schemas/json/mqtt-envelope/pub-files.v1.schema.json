@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/mqtt-envelope/pub-files.v1.schema.json",
+  "title": "MQTT Envelope PUB_FILES (v1)",
+  "version": "1.0.0",
+  "description": "File-transfer message envelope. Carries one or more file descriptors with optional checksums.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metadata", "data"],
+  "properties": {
+    "metadata": {
+      "$ref": "https://example.com/schemas/mqtt-envelope/metadata.v1.schema.json"
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["files"],
+      "properties": {
+        "context": {
+          "$ref": "https://example.com/schemas/mqtt-envelope/context.generic.v1.schema.json",
+          "default": {}
+        },
+        "files": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/FileTransfer" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "DocumentType": {
+      "type": "string",
+      "enum": ["Media", "Tableau"],
+      "description": "Logical category of the document."
+    },
+    "ChecksumType": {
+      "type": "string",
+      "enum": ["sha-256", "sha-512"]
+    },
+    "Checksum": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "value"],
+      "properties": {
+        "type": { "$ref": "#/$defs/ChecksumType" },
+        "value": { "type": "string" }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "type": { "const": "sha-256" } },
+            "required": ["type"]
+          },
+          "then": { "properties": { "value": { "pattern": "^[A-Fa-f0-9]{64}$" } } }
+        },
+        {
+          "if": {
+            "properties": { "type": { "const": "sha-512" } },
+            "required": ["type"]
+          },
+          "then": { "properties": { "value": { "pattern": "^[A-Fa-f0-9]{128}$" } } }
+        }
+      ]
+    },
+    "FileTransfer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["filename", "path", "document_type", "byte_size"],
+      "properties": {
+        "filename": { "type": "string", "minLength": 1, "description": "File name with extension." },
+        "path": { "type": "string", "minLength": 1, "description": "Logical path of the file on the source system." },
+        "document_type": { "$ref": "#/$defs/DocumentType" },
+        "byte_size": { "type": "integer", "minimum": 1, "description": "File size in bytes." },
+        "checksum": { "$ref": "#/$defs/Checksum" }
+      }
+    }
+  }
+}

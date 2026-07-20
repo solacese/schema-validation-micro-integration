@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/schemas/mqtt-envelope/metadata.v1.schema.json",
+  "title": "MQTT Envelope Metadata (v1)",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["topic", "timestamp", "message_id", "seq"],
+  "properties": {
+    "topic": {
+      "type": "string",
+      "minLength": 1,
+      "description": "MQTT topic on which the message was published (informative copy — the transport topic is authoritative)."
+    },
+    "timestamp": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Unix epoch in milliseconds."
+    },
+    "message_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique message identifier (UUID)."
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "description": "Sequence counter 0..255, wraps around."
+    }
+  }
+}

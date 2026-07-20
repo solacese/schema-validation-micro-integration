@@ -1,0 +1,16 @@
+.env
+.env.local
+.env.aws
+*.tar.gz
+*.zip
+*.log
+*.tmp
+*.bak
+.DS_Store
+.vscode/
+/target
+/.flattened-pom.xml
+/.runtime
+/performance/sdkperf-jcsmp-*/
+/performance/*.whl
+/email/

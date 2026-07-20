@@ -1,0 +1,24 @@
+{
+  "metadata": {
+    "topic": "Acme/SE/PMNO-077/DATASCIENCE/JSON-v1/FromEqt/PUB_FILES",
+    "timestamp": 1743436800000,
+    "message_id": "e5f6a7b8-c9d0-1234-ef01-345678901bcd",
+    "seq": 15
+  },
+  "data": {
+    "context": {
+      "project": "Casing",
+      "site": "SiteE",
+      "equipment_type": "Press",
+      "line": "L4"
+    },
+    "files": [
+      {
+        "filename": "pressure_readings.xlsx",
+        "path": "/data/casing/readings/",
+        "document_type": "Spreadsheet",
+        "byte_size": 78400
+      }
+    ]
+  }
+}

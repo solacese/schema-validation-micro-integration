@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "topic": "Acme/SD/PMNO-055/DATASCIENCE/JSON-v1/FromEqt/PUB_FILES",
+    "timestamp": 1743436800000,
+    "message_id": "d4e5f6a7-b8c9-0123-def0-234567890abc",
+    "seq": 99
+  },
+  "data": {
+    "context": {
+      "project": "Finishing",
+      "site": "SiteD",
+      "equipment_type": "CNC-Router",
+      "line": "L2"
+    },
+    "files": [
+      {
+        "filename": "engraving_log_2026-04-01.csv",
+        "path": "/data/finishing/logs/2026-04-01/",
+        "document_type": "Tableau",
+        "byte_size": 12800,
+        "checksum": {
+          "type": "sha-256",
+          "value": "ZZZZ_not_a_valid_hex_string_at_all"
+        }
+      }
+    ]
+  }
+}

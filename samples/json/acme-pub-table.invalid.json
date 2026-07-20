@@ -1,0 +1,11 @@
+{
+  "metadata": {
+    "topic": "Acme/SB/PMNO-042/DATASCIENCE/JSON-v1/FromEqt/PUB_TABLE",
+    "timestamp": 1743436800000,
+    "message_id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+    "seq": 8
+  },
+  "data": {
+    "table": []
+  }
+}

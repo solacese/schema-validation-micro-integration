@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "topic": "Acme/SA/PMNO-001/SHOPFLOOR/JSON-v1/FromSI/PUB_TABLE",
+    "timestamp": 1743436900000,
+    "message_id": "f6a7b8c9-d0e1-2345-f012-456789012cde",
+    "seq": 200
+  },
+  "data": {
+    "context": {
+      "project": "Assembly",
+      "site": "SiteA",
+      "source_system": "MES-Gateway",
+      "integration": "SI-Gateway"
+    },
+    "table": [
+      {
+        "timestamp": 1743436900000,
+        "operation": "CASE_OPEN",
+        "operator_id": "OP-3421",
+        "station": "ST-12",
+        "cycle_time_ms": 4200,
+        "status": "COMPLETE"
+      }
+    ]
+  }
+}

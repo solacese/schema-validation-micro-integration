@@ -1,0 +1,296 @@
+server:
+  port: ${PORT:8088}
+
+spring:
+  application:
+    name: schema-validation-micro-integration
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+    function:
+      definition: schemaValidationProcessor
+    stream:
+      default-binder: solace-input
+      output-bindings: schemaValidationResults-out-0
+      default:
+        consumer:
+          use-native-decoding: true
+          max-attempts: 1
+        producer:
+          use-native-encoding: true
+          error-channel-enabled: true
+      binders:
+        solace-input:
+          type: solace
+          environment:
+            solace:
+              java:
+                host: ${SOLACE_INPUT_BROKER:${URL:}}
+                msg-vpn: ${SOLACE_INPUT_VPN:${VPN:}}
+                client-username: ${SOLACE_INPUT_USERNAME:${USER:}}
+                client-password: ${SOLACE_INPUT_PASSWORD:${PWD:}}
+                connect-retries: -1
+                reconnect-retries: -1
+                api-properties:
+                  pub_ack_window_size: 255
+        solace-output:
+          type: solace
+          environment:
+            solace:
+              java:
+                host: ${SOLACE_OUTPUT_BROKER:${URL:}}
+                msg-vpn: ${SOLACE_OUTPUT_VPN:${VPN:}}
+                client-username: ${SOLACE_OUTPUT_USERNAME:${USER:}}
+                client-password: ${SOLACE_OUTPUT_PASSWORD:${PWD:}}
+                connect-retries: -1
+                reconnect-retries: -1
+                api-properties:
+                  pub_ack_window_size: 255
+      bindings:
+        schemaValidationProcessor-in-0:
+          binder: solace-input
+          destination: ${app.ingress.queue-name}
+          group: schema-validation
+          content-type: application/octet-stream
+          consumer:
+            concurrency: ${CONSUMER_CONCURRENCY:8}
+        schemaValidationResults-out-0:
+          binder: solace-output
+          destination: ${app.routing.validated-topic-template:schema/validated/bootstrap}
+          content-type: application/octet-stream
+      solace:
+        bindings:
+          schemaValidationProcessor-in-0:
+            consumer:
+              provision-durable-queue: true
+              queue-name-expression: destination
+              add-destination-as-subscription-to-queue: false
+              provision-error-queue: false
+              endpoint-type: queue
+          schemaValidationResults-out-0:
+            producer:
+              destination-type: topic
+              header-exclusions:
+                - id
+                - timestamp
+                - sourceData
+                - deliveryAttempt
+                - acknowledgmentCallback
+                - solace_connector_scst_publishAcknowledgmentCallback
+                - solace_connector_scst_targetDestinationType
+
+app:
+  max-payload-bytes: ${MAX_PAYLOAD_BYTES:1048576}
+  validation-timeout: ${VALIDATION_TIMEOUT:5s}
+  ingress:
+    queue-name: ${SCHEMA_VALIDATION_QUEUE:schema-validation/inbound}
+    partition-count: ${PARTITION_COUNT:0}
+    partition-rebalance-delay: ${PARTITION_REBALANCE_DELAY:5}
+    topic-subscriptions:
+      # {ENTERPRISE}/{SITE}/{PMNO}/{CATEGORY}/{PROTOCOL-Version}/{SOURCE}/{MESSAGE}
+      # Acme — DATASCIENCE + SHOPFLOOR, both sources
+      - Acme/*/*/DATASCIENCE/*/FromEqt/>
+      - Acme/*/*/DATASCIENCE/*/FromSI/>
+      - Acme/*/*/SHOPFLOOR/*/FromEqt/>
+      - Acme/*/*/SHOPFLOOR/*/FromSI/>
+      # Apex — DATASCIENCE + SHOPFLOOR, both sources
+      - Apex/*/*/DATASCIENCE/*/FromEqt/>
+      - Apex/*/*/DATASCIENCE/*/FromSI/>
+      - Apex/*/*/SHOPFLOOR/*/FromEqt/>
+      - Apex/*/*/SHOPFLOOR/*/FromSI/>
+  routing:
+    validated-topic-template: ${VALIDATED_TOPIC_TEMPLATE:{originalTopic}}
+    reject-topic-template: ${REJECT_TOPIC_TEMPLATE:{originalTopic}}
+    processing-error-topic-template: ${PROCESSING_ERROR_TOPIC_TEMPLATE:{originalTopic}}
+  schema-registry:
+    base-url: ${SCHEMA_REGISTRY_BASE_URL:http://localhost:18081/apis/registry/v3}
+    username: ${SCHEMA_REGISTRY_USERNAME:sr-readonly}
+    password: ${SCHEMA_REGISTRY_PASSWORD:roPassword}
+    request-timeout: ${SCHEMA_REGISTRY_REQUEST_TIMEOUT:3s}
+  cache:
+    topic-resolution-ttl: ${TOPIC_RESOLUTION_TTL:15m}
+    registry-lookup-ttl: ${REGISTRY_LOOKUP_TTL:60m}
+    schema-bundle-ttl: ${SCHEMA_BUNDLE_TTL:60m}
+    compiled-validator-ttl: ${COMPILED_VALIDATOR_TTL:60m}
+    max-topic-entries: ${MAX_TOPIC_CACHE_ENTRIES:5000}
+    max-registry-entries: ${MAX_REGISTRY_CACHE_ENTRIES:1000}
+    max-schema-entries: ${MAX_SCHEMA_CACHE_ENTRIES:1000}
+    max-validator-entries: ${MAX_VALIDATOR_CACHE_ENTRIES:1000}
+  prewarm:
+    enabled: ${SCHEMA_PREWARM_ENABLED:true}
+  mappings:
+    # ── Acme DATASCIENCE FromEqt ──
+    - id: acme-datascience-eqt-pub-files
+      topic-pattern: Acme/{site}/{pmno}/DATASCIENCE/{protocol}/FromEqt/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: acme-datascience-eqt-pub-table
+      topic-pattern: Acme/{site}/{pmno}/DATASCIENCE/{protocol}/FromEqt/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Acme DATASCIENCE FromSI ──
+    - id: acme-datascience-si-pub-files
+      topic-pattern: Acme/{site}/{pmno}/DATASCIENCE/{protocol}/FromSI/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: acme-datascience-si-pub-table
+      topic-pattern: Acme/{site}/{pmno}/DATASCIENCE/{protocol}/FromSI/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Acme SHOPFLOOR FromEqt ──
+    - id: acme-shopfloor-eqt-pub-files
+      topic-pattern: Acme/{site}/{pmno}/SHOPFLOOR/{protocol}/FromEqt/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: acme-shopfloor-eqt-pub-table
+      topic-pattern: Acme/{site}/{pmno}/SHOPFLOOR/{protocol}/FromEqt/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Acme SHOPFLOOR FromSI ──
+    - id: acme-shopfloor-si-pub-files
+      topic-pattern: Acme/{site}/{pmno}/SHOPFLOOR/{protocol}/FromSI/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: acme-shopfloor-si-pub-table
+      topic-pattern: Acme/{site}/{pmno}/SHOPFLOOR/{protocol}/FromSI/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Apex DATASCIENCE FromEqt ──
+    - id: apex-datascience-eqt-pub-files
+      topic-pattern: Apex/{site}/{pmno}/DATASCIENCE/{protocol}/FromEqt/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: apex-datascience-eqt-pub-table
+      topic-pattern: Apex/{site}/{pmno}/DATASCIENCE/{protocol}/FromEqt/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Apex DATASCIENCE FromSI ──
+    - id: apex-datascience-si-pub-files
+      topic-pattern: Apex/{site}/{pmno}/DATASCIENCE/{protocol}/FromSI/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: apex-datascience-si-pub-table
+      topic-pattern: Apex/{site}/{pmno}/DATASCIENCE/{protocol}/FromSI/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Apex SHOPFLOOR FromEqt ──
+    - id: apex-shopfloor-eqt-pub-files
+      topic-pattern: Apex/{site}/{pmno}/SHOPFLOOR/{protocol}/FromEqt/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: apex-shopfloor-eqt-pub-table
+      topic-pattern: Apex/{site}/{pmno}/SHOPFLOOR/{protocol}/FromEqt/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    # ── Apex SHOPFLOOR FromSI ──
+    - id: apex-shopfloor-si-pub-files
+      topic-pattern: Apex/{site}/{pmno}/SHOPFLOOR/{protocol}/FromSI/PUB_FILES
+      schema-group: manufacturing-iot
+      artifact-id: pub-files
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+    - id: apex-shopfloor-si-pub-table
+      topic-pattern: Apex/{site}/{pmno}/SHOPFLOOR/{protocol}/FromSI/PUB_TABLE
+      schema-group: manufacturing-iot
+      artifact-id: pub-table
+      artifact-type: JSON
+      version-strategy:
+        type: LATEST_ENABLED
+
+# Solace connector framework (reads from input binder)
+solace:
+  java:
+    host: ${SOLACE_INPUT_BROKER:${URL:}}
+    msg-vpn: ${SOLACE_INPUT_VPN:${VPN:}}
+    client-username: ${SOLACE_INPUT_USERNAME:${USER:}}
+    client-password: ${SOLACE_INPUT_PASSWORD:${PWD:}}
+    connect-retries: -1
+    reconnect-retries: -1
+    api-properties:
+      pub_ack_window_size: 255
+  connector:
+    security:
+      enabled: false
+    workflows:
+      0:
+        enabled: true
+        input-bindings:
+          - schemaValidationProcessor-in-0
+        output-bindings:
+          - schemaValidationResults-out-0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,bindings
+  datadog:
+    metrics:
+      export:
+        enabled: false
+  dynatrace:
+    metrics:
+      export:
+        enabled: false
+  influx:
+    metrics:
+      export:
+        enabled: false
+  otlp:
+    metrics:
+      export:
+        enabled: false
+  simple:
+    metrics:
+      export:
+        enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.solace.schemavalidator: INFO

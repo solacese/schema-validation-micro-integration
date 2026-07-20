@@ -1,0 +1,17 @@
+{
+  "metadata": {
+    "topic": "Acme/SA/PMNO-001/DATASCIENCE/JSON-v1/FromEqt/PUB_FILES",
+    "timestamp": 1743436800000,
+    "seq": 42
+  },
+  "data": {
+    "files": [
+      {
+        "filename": "report.csv",
+        "path": "/data/reports/",
+        "document_type": "Tableau",
+        "byte_size": 45230
+      }
+    ]
+  }
+}

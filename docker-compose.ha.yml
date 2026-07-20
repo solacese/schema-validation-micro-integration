@@ -1,0 +1,70 @@
+x-mi-common: &mi-common
+  image: schema-validation-micro-integration:local
+  init: true
+  env_file:
+    - .env
+  environment: &mi-env
+    SOLACE_BROKER: ${URL}
+    SOLACE_VPN: ${VPN}
+    SCHEMA_REGISTRY_BASE_URL: ${SCHEMA_REGISTRY_BASE_URL:-http://schema-registry-backend:8080/apis/registry/v3}
+    SCHEMA_REGISTRY_USERNAME: ${SCHEMA_REGISTRY_USERNAME:-sr-readonly}
+    SCHEMA_REGISTRY_PASSWORD: ${SCHEMA_REGISTRY_PASSWORD:-roPassword}
+    SPRING_PROFILES_ACTIVE: demo
+    CONSUMER_CONCURRENCY: 8
+    SCHEMA_REGISTRY_REQUEST_TIMEOUT: 1500ms
+    REGISTRY_LOOKUP_TTL: 120m
+    MAX_REGISTRY_CACHE_ENTRIES: 5000
+    MAX_SCHEMA_CACHE_ENTRIES: 5000
+    MAX_VALIDATOR_CACHE_ENTRIES: 5000
+    PARTITION_COUNT: ${PARTITION_COUNT:-0}
+    JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom}
+  volumes:
+    - ./config:/app/config:ro
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  read_only: true
+  tmpfs:
+    - /tmp:rw,nodev,nosuid,size=128m
+  cap_drop:
+    - ALL
+  security_opt:
+    - no-new-privileges:true
+  pids_limit: 512
+  cpus: 2.0
+  mem_limit: 2g
+  stop_grace_period: 45s
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD", "java", "-cp", "/app/healthcheck.jar", "Healthcheck"]
+    interval: 10s
+    timeout: 5s
+    retries: 5
+    start_period: 45s
+
+services:
+  mi-1:
+    <<: *mi-common
+    container_name: mi-1
+    ports:
+      - "${MI_1_HOST_PORT:-8088}:8088"
+    environment:
+      <<: *mi-env
+      PORT: 8088
+
+  mi-2:
+    <<: *mi-common
+    container_name: mi-2
+    ports:
+      - "${MI_2_HOST_PORT:-8089}:8089"
+    environment:
+      <<: *mi-env
+      PORT: 8089
+
+  mi-3:
+    <<: *mi-common
+    container_name: mi-3
+    ports:
+      - "${MI_3_HOST_PORT:-8090}:8090"
+    environment:
+      <<: *mi-env
+      PORT: 8090

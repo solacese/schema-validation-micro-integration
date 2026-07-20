@@ -1,0 +1,34 @@
+{
+  "metadata": {
+    "topic": "Acme/SA/PMNO-001/DATASCIENCE/JSON-v1/FromEqt/PUB_FILES",
+    "timestamp": 1743436800000,
+    "message_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "seq": 42
+  },
+  "data": {
+    "context": {
+      "project": "Assembly",
+      "site": "SiteA",
+      "equipment_type": "PackML-Controller",
+      "line": "L3"
+    },
+    "files": [
+      {
+        "filename": "production_report_2026-03-31.csv",
+        "path": "/data/assembly/reports/2026-03-31/",
+        "document_type": "Tableau",
+        "byte_size": 45230,
+        "checksum": {
+          "type": "sha-256",
+          "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      },
+      {
+        "filename": "quality_capture_001.jpg",
+        "path": "/data/assembly/media/2026-03-31/",
+        "document_type": "Media",
+        "byte_size": 2340567
+      }
+    ]
+  }
+}

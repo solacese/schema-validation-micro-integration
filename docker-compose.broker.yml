@@ -1,0 +1,25 @@
+services:
+  solace:
+    image: solace/solace-pubsub-standard:latest
+    container_name: solace-broker
+    hostname: solace-broker
+    shm_size: 1g
+    ulimits:
+      nofile:
+        soft: 2448
+        hard: 1048576
+    ports:
+      - "8080:8080"     # SEMP management
+      - "55554:55555"   # SMF (plain TCP)
+      - "55443:55443"   # SMF over TLS
+      - "1883:1883"     # MQTT
+      - "8883:8883"     # MQTT over TLS
+      - "8000:8000"     # WebSocket
+      - "8443:8443"     # WebSocket over TLS
+      - "9000:9000"     # REST
+      - "9443:9443"     # REST over TLS
+    environment:
+      username_admin_globalaccesslevel: admin
+      username_admin_password: admin
+      system_scaling_maxconnectioncount: 100
+    restart: unless-stopped
