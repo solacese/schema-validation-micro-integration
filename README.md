@@ -67,7 +67,9 @@ Send sustained load and watch throughput in real time:
                               └──────────────────────────┘
 ```
 
-The output message is published on the **same topic** as the input. The validation result is conveyed entirely via user properties:
+By default the output message is published on the **same topic** as the input, and the validation result is conveyed entirely via user properties. When the output topic must differ from the input topic — or must itself carry the result (see [Output Topic Routing](#output-topic-routing)) — the routing templates can rewrite the topic per outcome.
+
+The validation result is conveyed via user properties:
 
 | User Property            | Example                          |
 |--------------------------|----------------------------------|
@@ -82,6 +84,45 @@ The output message is published on the **same topic** as the input. The validati
 | `mi_original_topic`      | `Acme/SA/PMNO-001/.../PUB_FILES` |
 | `mi_mapping_id`          | `acme-datascience-eqt-pub-files` |
 | `mi_trace_id`            | _(UUID or propagated)_           |
+
+### Output Topic Routing
+
+Each validation outcome has its own configurable output-topic template, so the publish topic can differ from the consumed topic and can encode the result directly in the topic. This is essential for **single-broker deployments** and for clients on protocols without user-property/header support (e.g. **MQTT 3.1.1**), where consumers must subscribe based on the validation result rather than a message property.
+
+Templates support these placeholders:
+
+| Placeholder        | Value                                                        |
+|--------------------|--------------------------------------------------------------|
+| `{originalTopic}`  | The consumed topic, verbatim                                 |
+| `{outcome}`        | Configurable outcome label (`valid` / `invalid` / `error`)   |
+| `{schemaVersion}`  | Resolved schema version                                      |
+| `{mappingId}`      | Id of the resolved topic mapping                             |
+| `{<capture>}`      | Any named capture group from the matched topic pattern       |
+
+Configure per-outcome templates and the labels substituted for `{outcome}`:
+
+```yaml
+app:
+  routing:
+    validated-topic-template: "{originalTopic}/{outcome}"
+    reject-topic-template: "{originalTopic}/{outcome}"
+    processing-error-topic-template: "{originalTopic}/{outcome}"
+    outcome-labels:
+      validated: valid       # or VALID / Valid / V
+      reject: invalid        # or INVALID / Invalid / I
+      processing-error: error # or ERROR / Error / E
+```
+
+Examples (input → output):
+
+```
+acme/site1/line2/motor3/temperature4/raw/degrees  ->  acme/site1/line2/motor3/temperature4/valid/degrees
+Acme/Site1/Line2/Motor3/Temperature4              ->  Acme/Site1/Line2/Motor3/Temperature4/Invalid
+```
+
+The mid-topic example uses a topic pattern with captures, e.g. `acme/{site}/{line}/{motor}/{sensor}/raw/{unit}` matched on ingress, then `acme/{site}/{line}/{motor}/{sensor}/{outcome}/{unit}` as the template. All three templates default to `{originalTopic}` (same-topic republish) for backward compatibility.
+
+Environment-variable overrides: `VALIDATED_TOPIC_TEMPLATE`, `REJECT_TOPIC_TEMPLATE`, `PROCESSING_ERROR_TOPIC_TEMPLATE`, `OUTCOME_LABEL_VALIDATED`, `OUTCOME_LABEL_REJECT`, `OUTCOME_LABEL_PROCESSING_ERROR`.
 
 ### Schema Resolution
 
