@@ -138,6 +138,10 @@ public class AppProperties {
         @NotBlank
         private String processingErrorTopicTemplate;
 
+        @Valid
+        @NotNull
+        private OutcomeLabels outcomeLabels = new OutcomeLabels();
+
         public String getValidatedTopicTemplate() {
             return validatedTopicTemplate;
         }
@@ -160,6 +164,52 @@ public class AppProperties {
 
         public void setProcessingErrorTopicTemplate(String processingErrorTopicTemplate) {
             this.processingErrorTopicTemplate = processingErrorTopicTemplate;
+        }
+
+        public OutcomeLabels getOutcomeLabels() {
+            return outcomeLabels;
+        }
+
+        public void setOutcomeLabels(OutcomeLabels outcomeLabels) {
+            this.outcomeLabels = outcomeLabels;
+        }
+    }
+
+    /**
+     * Configurable labels substituted for the {@code {outcome}} placeholder in routing templates.
+     * Lets deployments choose their own casing/vocabulary, e.g. {@code valid/invalid/error},
+     * {@code VALID/INVALID/ERROR}, or {@code V/I/E}.
+     */
+    public static class OutcomeLabels {
+        @NotBlank
+        private String validated = "valid";
+        @NotBlank
+        private String reject = "invalid";
+        @NotBlank
+        private String processingError = "error";
+
+        public String getValidated() {
+            return validated;
+        }
+
+        public void setValidated(String validated) {
+            this.validated = validated;
+        }
+
+        public String getReject() {
+            return reject;
+        }
+
+        public void setReject(String reject) {
+            this.reject = reject;
+        }
+
+        public String getProcessingError() {
+            return processingError;
+        }
+
+        public void setProcessingError(String processingError) {
+            this.processingError = processingError;
         }
     }
 

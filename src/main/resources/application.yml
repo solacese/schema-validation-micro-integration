@@ -101,9 +101,25 @@ app:
       - Apex/*/*/SHOPFLOOR/*/FromEqt/>
       - Apex/*/*/SHOPFLOOR/*/FromSI/>
   routing:
+    # Output topic templates, selected by validation outcome. Supported placeholders:
+    #   {originalTopic}  - the consumed topic, verbatim
+    #   {schemaVersion}  - resolved schema version
+    #   {mappingId}      - id of the resolved topic mapping
+    #   {outcome}        - the configurable outcome label (see outcome-labels below)
+    #   {<capture>}      - any named capture group from the matched topic pattern
+    # Single-broker / no-header deployments (e.g. MQTT 3.1.1) can make the output topic
+    # differ from the input topic by embedding {outcome}, so consumers subscribe by result.
+    # Example: input  acme/site1/line2/motor3/temperature4/raw/degrees
+    #          output acme/site1/line2/motor3/temperature4/{outcome}/degrees
     validated-topic-template: ${VALIDATED_TOPIC_TEMPLATE:{originalTopic}}
     reject-topic-template: ${REJECT_TOPIC_TEMPLATE:{originalTopic}}
     processing-error-topic-template: ${PROCESSING_ERROR_TOPIC_TEMPLATE:{originalTopic}}
+    # Labels substituted for {outcome}. Override to match your vocabulary/casing,
+    # e.g. VALID/INVALID/ERROR or V/I/E.
+    outcome-labels:
+      validated: ${OUTCOME_LABEL_VALIDATED:valid}
+      reject: ${OUTCOME_LABEL_REJECT:invalid}
+      processing-error: ${OUTCOME_LABEL_PROCESSING_ERROR:error}
   schema-registry:
     base-url: ${SCHEMA_REGISTRY_BASE_URL:http://localhost:18081/apis/registry/v3}
     username: ${SCHEMA_REGISTRY_USERNAME:sr-readonly}

@@ -213,7 +213,8 @@ public class SchemaValidationService {
                                         FailureCategory failureCategory,
                                         String failureReason) {
         ResolvedTopicMapping synthetic = new ResolvedTopicMapping(new AppProperties.Mapping(), Map.of(), originalTopic);
-        String destination = topicTemplateRenderer.render(properties.getRouting().getProcessingErrorTopicTemplate(), synthetic, "unknown");
+        String destination = topicTemplateRenderer.render(properties.getRouting().getProcessingErrorTopicTemplate(), synthetic, "unknown",
+            outcomeLabel(RouteKind.PROCESSING_ERROR));
         Map<String, Object> headers = new LinkedHashMap<>();
         headers.put(SchemaMessageHeaders.VALIDATION_STATUS, RouteKind.PROCESSING_ERROR.name());
         headers.put(SchemaMessageHeaders.SCHEMA_GROUP, nullSafe(schemaGroup));
@@ -262,10 +263,20 @@ public class SchemaValidationService {
     }
 
     private String routeTopic(RouteKind routeKind, ResolvedTopicMapping resolvedTopicMapping, String schemaVersion) {
+        String outcomeLabel = outcomeLabel(routeKind);
         return switch (routeKind) {
-            case VALIDATED -> topicTemplateRenderer.render(properties.getRouting().getValidatedTopicTemplate(), resolvedTopicMapping, schemaVersion);
-            case REJECT -> topicTemplateRenderer.render(properties.getRouting().getRejectTopicTemplate(), resolvedTopicMapping, schemaVersion);
-            case PROCESSING_ERROR -> topicTemplateRenderer.render(properties.getRouting().getProcessingErrorTopicTemplate(), resolvedTopicMapping, schemaVersion);
+            case VALIDATED -> topicTemplateRenderer.render(properties.getRouting().getValidatedTopicTemplate(), resolvedTopicMapping, schemaVersion, outcomeLabel);
+            case REJECT -> topicTemplateRenderer.render(properties.getRouting().getRejectTopicTemplate(), resolvedTopicMapping, schemaVersion, outcomeLabel);
+            case PROCESSING_ERROR -> topicTemplateRenderer.render(properties.getRouting().getProcessingErrorTopicTemplate(), resolvedTopicMapping, schemaVersion, outcomeLabel);
+        };
+    }
+
+    private String outcomeLabel(RouteKind routeKind) {
+        AppProperties.OutcomeLabels labels = properties.getRouting().getOutcomeLabels();
+        return switch (routeKind) {
+            case VALIDATED -> labels.getValidated();
+            case REJECT -> labels.getReject();
+            case PROCESSING_ERROR -> labels.getProcessingError();
         };
     }
 
