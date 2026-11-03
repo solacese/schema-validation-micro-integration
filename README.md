@@ -16,11 +16,11 @@ For the complete walkthrough, use the [Word installation and setup guide](docs/S
 3. Download and install this integration:
 
 ```bash
-curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.1/schema-validation-micro-integration-1.0.1.tar.gz
-curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.1/SHA256SUMS
-awk '$2 == "schema-validation-micro-integration-1.0.1.tar.gz" {print}' SHA256SUMS | shasum -a 256 -c -
-tar -xzf schema-validation-micro-integration-1.0.1.tar.gz
-cd schema-validation-micro-integration-1.0.1
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.2/schema-validation-micro-integration-1.0.2.tar.gz
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.2/SHA256SUMS
+awk '$2 == "schema-validation-micro-integration-1.0.2.tar.gz" {print}' SHA256SUMS | shasum -a 256 -c -
+tar -xzf schema-validation-micro-integration-1.0.2.tar.gz
+cd schema-validation-micro-integration-1.0.2
 ./scripts/install.sh
 ```
 
@@ -52,7 +52,7 @@ A container image is also published for `linux/amd64` and `linux/arm64`. Solace 
 
 ```bash
 docker login ghcr.io
-docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.1
+docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.2
 ```
 
 For Java deployments, the release includes an executable JAR. With **Java 17+** and connection settings exported in the shell:

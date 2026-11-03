@@ -13,7 +13,7 @@
 
     <groupId>com.solace.microintegration</groupId>
     <artifactId>schema-validation-micro-integration</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
     <name>schema-validation-micro-integration</name>
     <description>Validates JSON Schema, Avro, XML Schema, and Protobuf payloads using Solace Schema Registry.</description>
 

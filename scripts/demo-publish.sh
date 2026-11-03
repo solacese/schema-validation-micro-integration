@@ -50,14 +50,15 @@ publish() {
     echo "  Schema:  ${schema_group}/${schema_name}:${schema_version}"
   fi
 
-  # Build schema header args for SDKPerf (-cpl=) and REST (Solace-User-Property-*)
-  local schema_headers=()
-  local rest_schema_headers=()
+  # Keep both argument arrays nonempty: macOS Bash 3.2 treats an empty array as
+  # unbound under set -u, including the intentionally headerless unmapped case.
+  local sdkperf_args=(-mt=persistent)
+  local rest_args=(-H "Content-Type: application/json" -H "Solace-Delivery-Mode: persistent")
   if [[ -n "${schema_group}" ]]; then
-    schema_headers+=("-cpl=String,schema_group,${schema_group},String,schema_name,${schema_name},String,schema_version,${schema_version}")
-    rest_schema_headers+=(-H "Solace-User-Property-schema_group: ${schema_group}")
-    rest_schema_headers+=(-H "Solace-User-Property-schema_name: ${schema_name}")
-    rest_schema_headers+=(-H "Solace-User-Property-schema_version: ${schema_version}")
+    sdkperf_args+=("-cpl=String,schema_group,${schema_group},String,schema_name,${schema_name},String,schema_version,${schema_version}")
+    rest_args+=(-H "Solace-User-Property-schema_group: ${schema_group}")
+    rest_args+=(-H "Solace-User-Property-schema_name: ${schema_name}")
+    rest_args+=(-H "Solace-User-Property-schema_version: ${schema_version}")
   fi
 
   if [[ -x "${SDKPERF}" ]]; then
@@ -66,8 +67,8 @@ publish() {
     sdkperf_url=$(build_sdkperf_url)
     vpn="${SOLACE_INPUT_VPN:-default}"
     "${SDKPERF}" -cip="${sdkperf_url}" -cu="${PUB_USER}@${vpn}" -cp="${PUB_PASS}" \
-      -ptl="${topic}" -pfl="${file}" -mt=persistent -mn=1 -mr=1 -ped=2 \
-      "${schema_headers[@]}" 2>&1 \
+      -ptl="${topic}" -pfl="${file}" -mn=1 -mr=1 -ped=2 \
+      "${sdkperf_args[@]}" 2>&1 \
       | grep -v '^CLASSPATH\|^JAVA:\|^SOLACE_VM'
   else
     # Fallback: Solace REST messaging
@@ -77,9 +78,7 @@ publish() {
     http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
       "${rest_url}/TOPIC/${topic}" \
       -u "${PUB_USER}:${PUB_PASS}" \
-      -H "Content-Type: application/json" \
-      -H "Solace-Delivery-Mode: persistent" \
-      "${rest_schema_headers[@]}" \
+      "${rest_args[@]}" \
       -d "@${file}")
     if [[ "${http_code}" == "200" ]]; then
       echo "  Result:  OK (REST ${http_code})"

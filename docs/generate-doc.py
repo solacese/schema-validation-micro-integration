@@ -221,7 +221,8 @@ code('./scripts/demo-publish.sh pub-files valid\n'
      './scripts/demo-publish.sh pub-files invalid\n'
      'docker logs --since 2m schema-validation-micro-integration 2>&1 | \\\n'
      '  grep -E "event=(validated|rejected)"')
-text('Expected: event=validated for the first message and event=rejected for the second '
+text('Allow a few seconds for asynchronous validation before reading the logs. '
+     'Expected: event=validated for the first message and event=rejected for the second '
      '(the invalid sample lacks message_id). An HTTP 200 from REST publishing confirms '
      'broker acceptance; the MI log or output user properties confirm validation.')
 step(3, 'Inspect the result or run all scenarios')
