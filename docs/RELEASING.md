@@ -22,6 +22,8 @@ The release workflow runs the verification/package steps, builds and publishes t
 - `SHA256SUMS`: SHA-256 checksums for the downloadable assets.
 - `ghcr.io/solacese/schema-validation-micro-integration:<version>`: container image, also tagged `latest`.
 
+The GHCR package remains private because the Solace organization disables public package visibility. Consumers need GitHub Packages credentials with read access and must authenticate using `docker login ghcr.io`. GitHub release archives and the standalone JAR are publicly downloadable.
+
 Bundled installation detects the prebuilt JARs and skips the Maven Docker stage. A source checkout still builds from source. Neither route requires a host JDK for Docker installation. Initial Docker base-image downloads and the separately downloaded licensed registry distribution are still required.
 
 The archive exporter uses Git's committed file list and normalized timestamps. It excludes Git internals, local credentials, runtime files, build output, downloaded registry distributions, and SDKPerf. Maven receives the commit timestamp through `project.build.outputTimestamp`; the dependency inventory and build metadata may still vary with the build toolchain.

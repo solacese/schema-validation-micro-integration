@@ -45,9 +45,10 @@ cp .env.example .env
 
 Point `SCHEMA_REGISTRY_BASE_URL` at an endpoint ending in `/apis/registry/v3`, reachable from Docker. Use `host.docker.internal` for a registry on this Mac. Mount optional configuration as `config/application.yml`. Change `app.ingress.topic-subscriptions` from the manufacturing demo defaults to your own topics.
 
-A container image is also published for `linux/amd64` and `linux/arm64`:
+A container image is also published for `linux/amd64` and `linux/arm64`. Solace organization policy keeps GHCR packages private. Sign in with an account and GitHub Packages credentials that can read this package before pulling:
 
 ```bash
+docker login ghcr.io
 docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.0
 ```
 
