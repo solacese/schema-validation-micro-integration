@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.1] - 2026-11-03
+
+Documentation patch release; application behavior is unchanged.
+
+- Replace the Word guide with a complete, step-by-step installation and setup manual.
+- Cover release downloads and checksum verification, local installation, existing services, Docker hostnames, schema registration, routing, Java/GHCR deployment, HA, and troubleshooting.
+- Include runnable examples for JSON, XML, Avro, and Protobuf and clarify local demonstration credentials and private GHCR access.
+- Synchronize the guide, README, standalone Word download, and packaged installation archives.
+
 ## [1.0.0] - 2026-11-03
 
 Initial packaged release of the Schema Validation Micro-Integration.

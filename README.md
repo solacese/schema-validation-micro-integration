@@ -7,6 +7,8 @@ Validate **JSON Schema, XML Schema, Avro, and Protobuf** messages using **Solace
 
 ## Install a release
 
+For the complete walkthrough, use the [Word installation and setup guide](docs/Schema-Validation-MI-Installation-Guide.docx). It covers each installation path, connection settings, and working examples for all four formats.
+
 **Requirements:** Docker with Compose v2+, Python 3.9+, and curl. Release bundles contain prebuilt Java artifacts; no local Java, Maven, or application compilation is needed for Docker installation.
 
 1. Download `schema-registry-v1.1.2.tar.gz` and its `.md5` file from [Solace Products](https://products.solace.com/products/1.1.2GA/Schema_Registry/solace-schema-registry/) into your Downloads folder. Leave them compressed.
@@ -14,14 +16,15 @@ Validate **JSON Schema, XML Schema, Avro, and Protobuf** messages using **Solace
 3. Download and install this integration:
 
 ```bash
-curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.0/schema-validation-micro-integration-1.0.0.tar.gz
-curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.0/SHA256SUMS
-# Compare the archive's SHA-256 with the matching entry in SHA256SUMS.
-shasum -a 256 schema-validation-micro-integration-1.0.0.tar.gz
-tar -xzf schema-validation-micro-integration-1.0.0.tar.gz
-cd schema-validation-micro-integration-1.0.0
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.1/schema-validation-micro-integration-1.0.1.tar.gz
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.1/SHA256SUMS
+awk '$2 == "schema-validation-micro-integration-1.0.1.tar.gz" {print}' SHA256SUMS | shasum -a 256 -c -
+tar -xzf schema-validation-micro-integration-1.0.1.tar.gz
+cd schema-validation-micro-integration-1.0.1
 ./scripts/install.sh
 ```
+
+The checksum command must report `OK` before you extract the archive. On Windows, run these commands in WSL2 with Docker integration enabled.
 
 Setup prepares the registry runtime, starts PostgreSQL and the identity provider, starts the broker, registers sample schemas, and starts the MI. It waits for healthy services and can be re-run. For an archive elsewhere, set `SCHEMA_REGISTRY_DIST=/path/to/schema-registry-v1.1.2.tar.gz` before installing. Public base images still require network access on first installation. The licensed registry distribution is downloaded separately and is not redistributed in this release.
 
@@ -49,7 +52,7 @@ A container image is also published for `linux/amd64` and `linux/arm64`. Solace 
 
 ```bash
 docker login ghcr.io
-docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.0
+docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.1
 ```
 
 For Java deployments, the release includes an executable JAR. With **Java 17+** and connection settings exported in the shell:
