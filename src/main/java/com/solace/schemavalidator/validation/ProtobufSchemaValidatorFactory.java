@@ -2,6 +2,7 @@ package com.solace.schemavalidator.validation;
 
 import com.solace.schemavalidator.registry.SchemaBundle;
 import com.solace.schemavalidator.registry.SchemaDocument;
+import com.solace.schemavalidator.registry.SchemaVersionCoordinate;
 import com.solace.schemavalidator.resolution.ArtifactType;
 import com.squareup.wire.ProtoAdapter;
 import com.squareup.wire.schema.Location;
@@ -9,12 +10,15 @@ import com.squareup.wire.schema.Schema;
 import com.squareup.wire.schema.SchemaLoader;
 import com.squareup.wire.schema.SchemaProtoAdapterFactory;
 import com.squareup.wire.schema.ProtoType;
+import com.squareup.wire.schema.MessageType;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 import okio.Buffer;
 import org.springframework.stereotype.Component;
 
@@ -49,12 +53,12 @@ public class ProtobufSchemaValidatorFactory implements ValidatorFactory {
             tempDir = Files.createTempDirectory("proto-schema-");
             writeProtoFiles(schemaBundle, tempDir);
 
-            List<Location> sourcePaths = List.of(Location.get(tempDir.toString()));
+            List<Location> sourcePaths = List.of(Location.get(tempDir.toString(), protoFileName(schemaBundle.root())));
             SchemaLoader loader = new SchemaLoader(tempDir.getFileSystem());
-            loader.initRoots(sourcePaths, List.of());
+            loader.initRoots(sourcePaths, List.of(Location.get(tempDir.toString())));
             Schema schema = loader.loadSchema();
 
-            String rootTypeName = resolveRootMessageType(schemaBundle.root());
+            String rootTypeName = resolveRootMessageType(schemaBundle.root(), schema);
             ProtoType protoType = ProtoType.get(rootTypeName);
 
             SchemaProtoAdapterFactory adapterFactory = new SchemaProtoAdapterFactory(schema, true);
@@ -63,7 +67,11 @@ public class ProtobufSchemaValidatorFactory implements ValidatorFactory {
 
             return payload -> {
                 try {
-                    adapter.decode(new Buffer().write(payload));
+                    Object decoded = adapter.decode(new Buffer().write(payload));
+                    String missing = missingRequiredField(schema, protoType, decoded, "");
+                    if (missing != null) {
+                        return ValidationOutcome.failure("Missing required Protobuf field: " + missing);
+                    }
                     return ValidationOutcome.success();
                 } catch (Exception ex) {
                     return ValidationOutcome.failure("Protobuf payload could not be decoded: " + ex.getMessage());
@@ -79,12 +87,59 @@ public class ProtobufSchemaValidatorFactory implements ValidatorFactory {
         }
     }
 
+    private static String missingRequiredField(Schema schema, ProtoType type, Object value, String path) {
+        if (!(schema.getType(type) instanceof MessageType message) || !(value instanceof Map<?, ?> fields)) {
+            return null;
+        }
+        for (var field : message.getFieldsAndOneOfFields()) {
+            Object fieldValue = fields.get(field.getName());
+            String fieldPath = path + field.getName();
+            if (field.isRequired() && fieldValue == null) {
+                return fieldPath;
+            }
+            if (field.getType().isMap() && fieldValue instanceof Map<?, ?> map) {
+                for (var entry : map.entrySet()) {
+                    String missing = missingRequiredField(schema, field.getType().getValueType(),
+                        entry.getValue(), fieldPath + "[" + entry.getKey() + "].");
+                    if (missing != null) return missing;
+                }
+            } else if (fieldValue instanceof List<?> repeated) {
+                for (int i = 0; i < repeated.size(); i++) {
+                    String missing = missingRequiredField(schema, field.getType(), repeated.get(i), fieldPath + "[" + i + "].");
+                    if (missing != null) return missing;
+                }
+            } else if (fieldValue != null) {
+                String missing = missingRequiredField(schema, field.getType(), fieldValue, fieldPath + ".");
+                if (missing != null) return missing;
+            }
+        }
+        return null;
+    }
+
     private static void writeProtoFiles(SchemaBundle bundle, Path dir) throws IOException {
+        Map<String, SchemaDocument> files = new LinkedHashMap<>();
+        files.put(protoFileName(bundle.root()), bundle.root());
         for (SchemaDocument document : bundle.compilationOrder()) {
-            String fileName = protoFileName(document);
-            Path file = dir.resolve(fileName);
+            for (var reference : document.references()) {
+                SchemaDocument referenced = bundle.documents().get(new SchemaVersionCoordinate(
+                    reference.groupId(), reference.artifactId(), reference.version()));
+                if (referenced == null) {
+                    throw new IllegalStateException("Missing Protobuf reference: " + reference.name());
+                }
+                SchemaDocument previous = files.putIfAbsent(reference.name(), referenced);
+                if (previous != null && !previous.coordinate().equals(referenced.coordinate())) {
+                    throw new IllegalStateException("Conflicting Protobuf import name: " + reference.name());
+                }
+            }
+        }
+        for (var entry : files.entrySet()) {
+            String fileName = entry.getKey();
+            Path file = dir.resolve(fileName).normalize();
+            if (!file.startsWith(dir)) {
+                throw new IllegalStateException("Protobuf artifact path escapes the schema directory: " + fileName);
+            }
             Files.createDirectories(file.getParent());
-            Files.writeString(file, document.content());
+            Files.writeString(file, entry.getValue().content());
         }
     }
 
@@ -98,7 +153,7 @@ public class ProtobufSchemaValidatorFactory implements ValidatorFactory {
      * Checks for an optional {@code // @root MessageName} directive on the first line,
      * otherwise returns the name from the first {@code message} declaration.
      */
-    static String resolveRootMessageType(SchemaDocument root) {
+    static String resolveRootMessageType(SchemaDocument root, Schema schema) {
         String content = root.content();
         String[] lines = content.split("\n", -1);
         // Check for explicit directive on first non-empty line
@@ -112,24 +167,13 @@ public class ProtobufSchemaValidatorFactory implements ValidatorFactory {
             }
             break;
         }
-        // Extract package prefix (if present) for fully-qualified name
-        String packageName = null;
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.startsWith("package ") && trimmed.endsWith(";")) {
-                packageName = trimmed.substring("package ".length(), trimmed.length() - 1).trim();
-                break;
-            }
-        }
-        // Find first message declaration
-        for (String line : lines) {
-            String trimmed = line.trim();
-            if (trimmed.startsWith("message ")) {
-                String rest = trimmed.substring("message ".length()).trim();
-                int end = rest.indexOf('{');
-                if (end > 0) {
-                    String simpleName = rest.substring(0, end).trim();
-                    return packageName != null ? packageName + "." + simpleName : simpleName;
+        // Use Wire's parsed model so legal whitespace, comments, enum declarations,
+        // and braces on a separate line do not affect root inference.
+        var rootFile = schema.protoFile(protoFileName(root));
+        if (rootFile != null) {
+            for (var type : rootFile.getTypes()) {
+                if (type instanceof MessageType) {
+                    return type.getType().toString();
                 }
             }
         }

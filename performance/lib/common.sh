@@ -20,7 +20,7 @@ divider() { echo -e "${DIM}─────────────────�
 # ---------- paths ----------
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 ROOT_DIR="${ROOT_DIR:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
-SDKPERF_CMD="${SDKPERF_CMD:-${ROOT_DIR}/performance/sdkperf-jcsmp-10.29.1/sdkperf_java.sh}"
+SDKPERF_CMD="${SDKPERF_CMD:-${ROOT_DIR}/performance/sdkperf-jcsmp-${SDKPERF_VERSION:-10.29.1}/sdkperf_java.sh}"
 MI_HOST="${MI_HOST:-localhost}"
 MI_PORT="${MI_PORT:-8088}"
 
@@ -31,25 +31,18 @@ load_env() {
     error "Missing ${env_file} — copy .env.example and fill in broker credentials"
     exit 1
   fi
-  set -a
-  source "${env_file}"
-  set +a
-  : "${URL:?Missing URL in .env}"
-  : "${VPN:?Missing VPN in .env}"
-  : "${USER:?Missing USER in .env}"
-  : "${PWD:?Missing PWD in .env}"
-
+  source "${ROOT_DIR}/scripts/lib/env.sh"
+  load_project_env
   # SDKPerf runs on the host — translate container hostnames to localhost
   # SDKPerf uses JCSMP (SMF), so translate wss:// cloud URLs to tcps:// SMF
-  local sdkperf_url="${URL}"
-  sdkperf_url="${sdkperf_url//solace-broker/localhost}"
-  sdkperf_url="${sdkperf_url//55555/55554}"
+  local sdkperf_url="${SOLACE_INPUT_BROKER:-tcp://solace-broker:55555}"
+  sdkperf_url="$(host_smf_url "${sdkperf_url}")"
   if [[ "${sdkperf_url}" == wss://* ]]; then
     sdkperf_url="${sdkperf_url/wss:\/\//tcps://}"
     sdkperf_url="${sdkperf_url/:443/:55443}"
   fi
-  SDKPERF_CONN_ARGS=("-cip=${sdkperf_url}" "-cu=${USER}@${VPN}" "-cp=${PWD}")
-  success "Loaded broker (VPN: ${VPN}, sdkperf→${sdkperf_url})"
+  SDKPERF_CONN_ARGS=("-cip=${sdkperf_url}" "-cu=${SOLACE_INPUT_USERNAME:-default}@${SOLACE_INPUT_VPN:-default}" "-cp=${SOLACE_INPUT_PASSWORD:-default}")
+  success "Loaded broker (VPN: ${SOLACE_INPUT_VPN:-default}, sdkperf→${sdkperf_url})"
 }
 
 # ---------- sdkperf wrapper ----------
@@ -81,11 +74,12 @@ check_mi_health() {
     error "Is the MI running? Try: docker compose -f docker-compose.local.yml up -d --build"
     exit 1
   fi
-  if echo "${health}" | grep -q '"UP"'; then
+  if echo "${health}" | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin).get("status") != "UP")'; then
     success "MI is UP (healthy)"
   else
     warn "MI is reachable but health is: ${health}"
-    warn "Continuing anyway — registry may be unreachable from container"
+    error "Performance tests require a healthy MI"
+    exit 1
   fi
 }
 
@@ -248,7 +242,7 @@ check_ha_health() {
     local p="${HA_PORTS[$i]}"
     local health
     health=$(curl -s "http://localhost:${p}/actuator/health" 2>/dev/null) || true
-    if echo "${health}" | grep -q '"UP"'; then
+    if echo "${health}" | python3 -c 'import json,sys; sys.exit(json.load(sys.stdin).get("status") != "UP")'; then
       success "${c} (port ${p}): UP"
     elif [[ -n "${health}" ]]; then
       warn "${c} (port ${p}): ${health}"

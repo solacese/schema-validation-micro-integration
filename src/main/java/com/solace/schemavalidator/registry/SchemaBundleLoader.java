@@ -6,6 +6,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
+import java.util.Set;
 
 public class SchemaBundleLoader {
 
@@ -62,7 +64,7 @@ public class SchemaBundleLoader {
         metrics.recordSchemaBundleCacheMiss();
         Map<SchemaVersionCoordinate, SchemaDocument> documents = new LinkedHashMap<>();
         List<SchemaDocument> compilationOrder = new ArrayList<>();
-        SchemaDocument root = loadRecursive(metadata, documents, compilationOrder);
+        SchemaDocument root = loadRecursive(metadata, documents, compilationOrder, new HashSet<>());
         SchemaBundle bundle = new SchemaBundle(root, documents, List.copyOf(compilationOrder));
         cache.put(coordinate, bundle);
         return bundle;
@@ -70,18 +72,22 @@ public class SchemaBundleLoader {
 
     private SchemaDocument loadRecursive(SchemaVersionMetadata metadata,
                                          Map<SchemaVersionCoordinate, SchemaDocument> documents,
-                                         List<SchemaDocument> compilationOrder) {
+                                         List<SchemaDocument> compilationOrder,
+                                         Set<SchemaVersionCoordinate> visiting) {
         SchemaVersionCoordinate coordinate = new SchemaVersionCoordinate(metadata.groupId(), metadata.artifactId(), metadata.version());
         SchemaDocument existing = documents.get(coordinate);
         if (existing != null) {
             return existing;
+        }
+        if (!visiting.add(coordinate)) {
+            throw new SchemaRegistryException("Cyclic schema reference at " + coordinate);
         }
         List<ArtifactReference> references = schemaRegistryClient.getVersionReferences(
             metadata.groupId(), metadata.artifactId(), metadata.version());
         for (ArtifactReference reference : references) {
             SchemaVersionMetadata childMetadata = schemaRegistryClient.getVersionMetadata(
                 reference.groupId(), reference.artifactId(), reference.version());
-            loadRecursive(childMetadata, documents, compilationOrder);
+            loadRecursive(childMetadata, documents, compilationOrder, visiting);
         }
         SchemaDocument document = new SchemaDocument(
             coordinate,
@@ -89,6 +95,7 @@ public class SchemaBundleLoader {
             schemaRegistryClient.getVersionContent(metadata.groupId(), metadata.artifactId(), metadata.version()),
             List.copyOf(references));
         documents.put(coordinate, document);
+        visiting.remove(coordinate);
         compilationOrder.add(document);
         return document;
     }

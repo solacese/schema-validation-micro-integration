@@ -44,6 +44,9 @@ public class XmlSchemaValidatorFactory implements ValidatorFactory {
         }
         try {
             SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+            schemaFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            schemaFactory.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            schemaFactory.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
             schemaFactory.setResourceResolver(new InMemoryXsdResolver(referenceContents));
             Source source = new StreamSource(new StringReader(schemaBundle.root().content()));
             source.setSystemId(schemaBundle.root().coordinate().artifactId());
@@ -51,7 +54,9 @@ public class XmlSchemaValidatorFactory implements ValidatorFactory {
             return payload -> {
                 try {
                     Validator validator = schema.newValidator();
-                    StreamSource xml = new StreamSource(new StringReader(new String(payload, java.nio.charset.StandardCharsets.UTF_8)));
+                    validator.setProperty(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+                    validator.setProperty(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+                    StreamSource xml = new StreamSource(new java.io.ByteArrayInputStream(payload));
                     validator.validate(xml);
                     return ValidationOutcome.success();
                 } catch (Exception ex) {

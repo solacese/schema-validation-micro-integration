@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.Message;
@@ -83,7 +84,16 @@ public class SchemaValidationService {
         this.clock = clock;
         this.maxPayloadBytes = properties.getMaxPayloadBytes();
         this.validationTimeoutMs = properties.getValidationTimeout().toMillis();
-        this.validationExecutor = Executors.newCachedThreadPool();
+        this.validationExecutor = Executors.newFixedThreadPool(Math.max(2, Runtime.getRuntime().availableProcessors()), task -> {
+            Thread thread = new Thread(task, "schema-validation-worker");
+            thread.setDaemon(true);
+            return thread;
+        });
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        validationExecutor.shutdownNow();
     }
 
     public void handle(Message<?> message) {
@@ -123,7 +133,7 @@ public class SchemaValidationService {
                 headerMapping.setId("header-declared");
                 headerMapping.setSchemaGroup(headerGroup);
                 headerMapping.setArtifactId(headerName);
-                headerMapping.setArtifactType(ArtifactType.JSON);
+                headerMapping.setArtifactType(ArtifactType.UNKNOWN);
                 resolvedTopicMapping = new ResolvedTopicMapping(headerMapping, Map.of(), originalTopic);
                 versionExpression = StringUtils.hasText(headerVersion) ? headerVersion : "latest-enabled";
                 LOGGER.debug("event=header_resolved topic={} schema={}/{} version={}", originalTopic, headerGroup, headerName, versionExpression);
@@ -137,6 +147,10 @@ public class SchemaValidationService {
                 resolvedTopicMapping.mapping().getSchemaGroup(),
                 resolvedTopicMapping.mapping().getArtifactId(),
                 versionExpression);
+            if ("header-declared".equals(resolvedTopicMapping.mapping().getId())) {
+                // Publishers declare a coordinate; the registry owns its format.
+                resolvedTopicMapping.mapping().setArtifactType(schemaBundle.root().artifactType());
+            }
             CompiledValidator validator = validatorService.getValidator(schemaBundle);
 
             ValidationOutcome outcome = validateWithTimeout(validator, payload);
@@ -247,7 +261,7 @@ public class SchemaValidationService {
         headers.put(SchemaMessageHeaders.SCHEMA_GROUP, resolvedTopicMapping.mapping().getSchemaGroup());
         headers.put(SchemaMessageHeaders.SCHEMA_ARTIFACT, resolvedTopicMapping.mapping().getArtifactId());
         headers.put(SchemaMessageHeaders.SCHEMA_VERSION, schemaVersion);
-        headers.put(SchemaMessageHeaders.SCHEMA_TYPE, resolvedTopicMapping.mapping().getArtifactType().name());
+        headers.put(SchemaMessageHeaders.SCHEMA_TYPE, resolvedTopicMapping.mapping().getArtifactType().getRegistryType());
         headers.put(SchemaMessageHeaders.VALIDATION_TIMESTAMP, Instant.now(clock).toString());
         headers.put(SchemaMessageHeaders.FAILURE_CATEGORY, failureCategory.name());
         headers.put(SchemaMessageHeaders.FAILURE_REASON, truncate(failureReason));

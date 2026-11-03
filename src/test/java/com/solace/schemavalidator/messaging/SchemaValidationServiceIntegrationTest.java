@@ -1,7 +1,7 @@
 package com.solace.schemavalidator.messaging;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.solace.schemavalidator.TestMeters;
 import com.solace.schemavalidator.config.AppProperties;
 import com.solace.schemavalidator.observability.TraceIdExtractor;
@@ -99,7 +99,7 @@ class SchemaValidationServiceIntegrationTest {
         ValidatorService validatorService = new ValidatorService(
             List.of(
                 new AvroSchemaValidatorFactory(),
-                new JsonSchemaValidatorFactory(new ObjectMapper()),
+                new JsonSchemaValidatorFactory(tools.jackson.databind.json.JsonMapper.builder().build()),
                 new XmlSchemaValidatorFactory()),
             Caffeine.newBuilder().build(),
             metrics);

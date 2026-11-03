@@ -4,18 +4,17 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SDKPERF="${ROOT_DIR}/performance/sdkperf-jcsmp-10.29.1/sdkperf_java.sh"
+SDKPERF="${SDKPERF_CMD:-${ROOT_DIR}/performance/sdkperf-jcsmp-${SDKPERF_VERSION:-10.29.1}/sdkperf_java.sh}"
 
-set -a
-source "${ROOT_DIR}/.env"
-set +a
+source "${ROOT_DIR}/scripts/lib/env.sh"
+load_project_env
 
-PUB_USER="${SOLACE_INPUT_USERNAME:-${USER}}"
-PUB_PASS="${SOLACE_INPUT_PASSWORD:-${PWD}}"
+PUB_USER="${SOLACE_INPUT_USERNAME:-default}"
+PUB_PASS="${SOLACE_INPUT_PASSWORD:-default}"
 
 # Build REST messaging URL for Solace (works with both local and cloud brokers)
 build_rest_url() {
-  local broker="${SOLACE_INPUT_BROKER:-${URL}}"
+  local broker="${SOLACE_INPUT_BROKER:-tcp://solace-broker:55555}"
   if [[ "${broker}" == wss://* ]]; then
     # Solace Cloud: REST messaging on HTTPS port 9443
     local host
@@ -33,9 +32,8 @@ build_rest_url() {
 
 # Build SDKPerf connection URL (SMF protocol)
 build_sdkperf_url() {
-  local url="${SOLACE_INPUT_BROKER:-${URL}}"
-  url="${url//solace-broker/localhost}"
-  url="${url//55555/55554}"
+  local url="${SOLACE_INPUT_BROKER:-tcp://solace-broker:55555}"
+  url="$(host_smf_url "${url}")"
   if [[ "${url}" == wss://* ]]; then
     url="${url/wss:\/\//tcps://}"
     url="${url/:443/:55443}"
@@ -66,11 +64,11 @@ publish() {
     # Prefer SDKPerf if available
     local sdkperf_url vpn
     sdkperf_url=$(build_sdkperf_url)
-    vpn="${SOLACE_INPUT_VPN:-${VPN}}"
+    vpn="${SOLACE_INPUT_VPN:-default}"
     "${SDKPERF}" -cip="${sdkperf_url}" -cu="${PUB_USER}@${vpn}" -cp="${PUB_PASS}" \
       -ptl="${topic}" -pfl="${file}" -mt=persistent -mn=1 -mr=1 -ped=2 \
       "${schema_headers[@]}" 2>&1 \
-      | grep -v '^CLASSPATH\|^JAVA:\|^SOLACE_VM' | grep "transmitted" || true
+      | grep -v '^CLASSPATH\|^JAVA:\|^SOLACE_VM'
   else
     # Fallback: Solace REST messaging
     local rest_url
@@ -87,6 +85,7 @@ publish() {
       echo "  Result:  OK (REST ${http_code})"
     else
       echo "  Result:  FAILED (REST ${http_code})" >&2
+      return 1
     fi
   fi
   echo ""

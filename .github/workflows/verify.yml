@@ -1,0 +1,31 @@
+name: Verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        java: ['17', '21', '25']
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: ${{ matrix.java }}
+          cache: maven
+      - run: ./scripts/verify.sh
+      - name: Validate Compose configurations
+        run: |
+          cp .env.example .env
+          for file in docker-compose.*.yml; do
+            IDP_KEY=ci-placeholder docker compose -f "$file" config --quiet
+          done
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: docker build -t schema-validation-micro-integration:ci .

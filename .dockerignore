@@ -5,8 +5,15 @@
 .runtime
 .flattened-pom.xml
 target
+dist
+.github
 performance
 samples
 schemas
 scripts
 *.md
+
+schema-registry-v*
+docs
+*.tar.gz
+*.zip

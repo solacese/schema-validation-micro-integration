@@ -7,25 +7,25 @@
     <parent>
         <groupId>com.solace.microintegration.core</groupId>
         <artifactId>micro-integration-build-parent</artifactId>
-        <version>3.0.6</version>
+        <version>4.3.11</version>
         <relativePath/>
     </parent>
 
     <groupId>com.solace.microintegration</groupId>
     <artifactId>schema-validation-micro-integration</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>schema-validation-micro-integration</name>
-    <description>Schema validation micro-integration built on the Solace MDK.</description>
+    <description>Validates JSON Schema, Avro, XML Schema, and Protobuf payloads using Solace Schema Registry.</description>
 
     <properties>
         <java.version>17</java.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <avro.version>1.12.0</avro.version>
-        <caffeine.version>3.1.8</caffeine.version>
-        <json-schema-validator.version>1.5.6</json-schema-validator.version>
-        <wiremock.version>3.9.2</wiremock.version>
-        <wire.version>5.2.0</wire.version>
-        <kotlin.version>2.0.21</kotlin.version>
+        <avro.version>1.12.2</avro.version>
+        <caffeine.version>3.3.1</caffeine.version>
+        <json-schema-validator.version>3.0.8</json-schema-validator.version>
+        <wiremock.version>3.13.2</wiremock.version>
+        <wire.version>7.1.2</wire.version>
+        <kotlin.version>2.4.21</kotlin.version>
     </properties>
 
     <dependencyManagement>
@@ -44,10 +44,9 @@
     </dependencyManagement>
 
     <dependencies>
-        <dependency>
-            <groupId>com.solace.connector.core</groupId>
-            <artifactId>pubsubplus-connector-framework</artifactId>
-        </dependency>
+        <!-- The custom validation Consumer owns processing and routing. Use the
+             MDK dependency platform without its separate workflow runtime, which
+             owns the same channels and disables ordinary function startup. -->
         <dependency>
             <groupId>com.solace.spring.cloud</groupId>
             <artifactId>spring-cloud-starter-stream-solace</artifactId>
@@ -112,14 +111,10 @@
             <version>${wiremock.version}</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.solace.connector.core.test</groupId>
-            <artifactId>pubsubplus-connector-framework-test-support-utilities</artifactId>
-            <scope>test</scope>
-        </dependency>
     </dependencies>
 
     <build>
+        <finalName>${project.artifactId}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -128,7 +123,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.5.0</version>
+                <version>3.6.2</version>
                 <executions>
                     <execution>
                         <id>enforce-dependency-rules</id>
@@ -137,6 +132,9 @@
                         </goals>
                         <configuration>
                             <rules>
+                                <requireJavaVersion>
+                                    <version>[17,)</version>
+                                </requireJavaVersion>
                                 <requireReleaseDeps>
                                     <message>No Snapshots Allowed!</message>
                                     <onlyWhenRelease>true</onlyWhenRelease>

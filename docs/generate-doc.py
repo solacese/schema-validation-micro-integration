@@ -1,702 +1,236 @@
 #!/usr/bin/env python3
-"""
-Generate the Schema Validation Micro-Integration Installation & Operations Guide
-as a professionally formatted Word document (.docx).
-"""
-
+"""Generate the concise installation and operations guide. Requires python-docx."""
+from pathlib import Path
 from docx import Document
-from docx.shared import Inches, Pt, Cm, RGBColor
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT
-from docx.enum.section import WD_ORIENT
-from docx.oxml.ns import qn, nsdecls
-from docx.oxml import parse_xml
-import os
+from docx.shared import Inches, Pt, RGBColor
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
-# Output path
-OUTPUT_DIR = os.path.dirname(os.path.abspath(__file__))
-OUTPUT_PATH = os.path.join(OUTPUT_DIR, "Schema-Validation-MI-Installation-Guide.docx")
-
+OUTPUT = Path(__file__).with_name('Schema-Validation-MI-Installation-Guide.docx')
 doc = Document()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Helper functions
-# ─────────────────────────────────────────────────────────────────────────────
-
-def set_cell_shading(cell, color):
-    """Set background shading on a table cell."""
-    shading_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color}"/>')
-    cell._tc.get_or_add_tcPr().append(shading_elm)
-
-
-def set_table_borders(table):
-    """Apply borders to all cells in a table."""
-    tbl = table._tbl
-    tblPr = tbl.tblPr if tbl.tblPr is not None else parse_xml(f'<w:tblPr {nsdecls("w")}/>')
-    borders = parse_xml(
-        f'<w:tblBorders {nsdecls("w")}>'
-        '<w:top w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '<w:left w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '<w:bottom w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '<w:right w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '<w:insideH w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '<w:insideV w:val="single" w:sz="4" w:space="0" w:color="999999"/>'
-        '</w:tblBorders>'
-    )
-    tblPr.append(borders)
-    if tbl.tblPr is None:
-        tbl.append(tblPr)
+section = doc.sections[0]
+section.top_margin = section.bottom_margin = Inches(0.7)
+section.left_margin = section.right_margin = Inches(0.75)
+for name in ['Normal', 'Title', 'Subtitle', 'Heading 1', 'Heading 2']:
+    style = doc.styles[name]
+    style.font.name = 'Calibri'
+    style.font.color.rgb = RGBColor(0, 0, 0)
+doc.styles['Normal'].font.size = Pt(10.5)
+doc.styles['Normal'].paragraph_format.space_after = Pt(6)
+for name in ['Heading 1', 'Heading 2']:
+    doc.styles[name].paragraph_format.space_before = Pt(10)
+    doc.styles[name].paragraph_format.space_after = Pt(5)
+# Word's default Title style can carry a blue bottom border.
+for style in doc.styles:
+    if style.element.pPr is not None:
+        for border in list(style.element.pPr.findall(qn('w:pBdr'))):
+            style.element.pPr.remove(border)
+doc.styles['Heading 1'].font.size = Pt(18)
+doc.styles['Heading 2'].font.size = Pt(12)
 
 
-def add_code_block(doc, code_text):
-    """Add a code block with monospaced font and light gray background."""
-    for line in code_text.strip().split('\n'):
+def text(value):
+    doc.add_paragraph(value)
+
+
+def heading(value):
+    doc.add_heading(value, level=2)
+
+
+def code(value):
+    for line in value.strip().splitlines():
         p = doc.add_paragraph()
-        p.paragraph_format.space_before = Pt(0)
-        p.paragraph_format.space_after = Pt(0)
-        p.paragraph_format.left_indent = Cm(1)
+        p.paragraph_format.space_after = Pt(1)
         run = p.add_run(line)
-        run.font.name = 'Courier New'
-        run.font.size = Pt(9)
-        run.font.color.rgb = RGBColor(0x1A, 0x1A, 0x1A)
-        # Set shading on the paragraph
-        pPr = p._p.get_or_add_pPr()
-        shading = parse_xml(f'<w:shd {nsdecls("w")} w:val="clear" w:color="auto" w:fill="F2F2F2"/>')
-        pPr.append(shading)
-
-
-def add_table(doc, headers, rows, col_widths=None):
-    """Add a formatted table with header row shading."""
-    table = doc.add_table(rows=1 + len(rows), cols=len(headers))
-    table.alignment = WD_TABLE_ALIGNMENT.LEFT
-    set_table_borders(table)
-
-    # Header row
-    for i, header in enumerate(headers):
-        cell = table.rows[0].cells[i]
-        cell.text = ''
-        p = cell.paragraphs[0]
-        run = p.add_run(header)
-        run.bold = True
-        run.font.size = Pt(10)
-        set_cell_shading(cell, "2E4057")
-        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
-
-    # Data rows
-    for row_idx, row_data in enumerate(rows):
-        for col_idx, cell_text in enumerate(row_data):
-            cell = table.rows[row_idx + 1].cells[col_idx]
-            cell.text = ''
-            p = cell.paragraphs[0]
-            run = p.add_run(str(cell_text))
-            run.font.size = Pt(9)
-            # Alternate row shading
-            if row_idx % 2 == 0:
-                set_cell_shading(cell, "F7F9FC")
-
-    # Set column widths if provided
-    if col_widths:
-        for i, width in enumerate(col_widths):
-            for row in table.rows:
-                row.cells[i].width = width
-
-    doc.add_paragraph()  # spacing after table
-    return table
-
-
-def add_bullet(doc, text, level=0):
-    """Add a bullet point."""
-    p = doc.add_paragraph(text, style='List Bullet')
-    if level > 0:
-        p.paragraph_format.left_indent = Cm(1.27 * (level + 1))
-    return p
-
-
-def add_bullet_code(doc, text):
-    """Add a bullet point with code-style text."""
-    p = doc.add_paragraph(style='List Bullet')
-    run = p.add_run(text)
-    run.font.name = 'Courier New'
-    run.font.size = Pt(9)
-    return p
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TITLE PAGE
-# ─────────────────────────────────────────────────────────────────────────────
-
-# Add some vertical spacing
-for _ in range(6):
-    doc.add_paragraph()
-
-title = doc.add_paragraph()
-title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = title.add_run("Schema Validation\nMicro-Integration")
-run.font.size = Pt(36)
-run.font.color.rgb = RGBColor(0x2E, 0x40, 0x57)
-run.bold = True
-
-doc.add_paragraph()
-
-subtitle = doc.add_paragraph()
-subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = subtitle.add_run("Installation & Operations Guide")
-run.font.size = Pt(20)
-run.font.color.rgb = RGBColor(0x5A, 0x6A, 0x7A)
-
-doc.add_paragraph()
-doc.add_paragraph()
-
-version_info = doc.add_paragraph()
-version_info.alignment = WD_ALIGN_PARAGRAPH.CENTER
-run = version_info.add_run("Version 1.0")
-run.font.size = Pt(12)
-run.font.color.rgb = RGBColor(0x88, 0x88, 0x88)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# TABLE OF CONTENTS
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("Table of Contents", level=1)
-
-toc_entries = [
-    "1. Overview",
-    "2. Prerequisites",
-    "3. Installation — Single Instance",
-    "    3.1 Clone and configure",
-    "    3.2 Build the Docker image",
-    "    3.3 Start the MI",
-    "    3.4 Verify health",
-    "4. Configuration Reference",
-    "    4.1 Environment variables",
-    "    4.2 Cache tuning",
-    "    4.3 Topic mappings (application.yml)",
-    "5. High Availability Setup",
-    "    5.1 Architecture",
-    "    5.2 Deploy 3-instance cluster",
-    "    5.3 Verify HA cluster",
-    "    5.4 Failover behavior",
-    "    5.5 Rolling restart procedure",
-    "    5.6 Scaling considerations",
-    "6. Partitioned Queue Setup",
-    "7. Schema Registry Setup",
-    "    7.1 Register schemas",
-    "    7.2 Custom schemas",
-    "8. Monitoring & Health Checks",
-    "    8.1 Endpoints",
-    "    8.2 Key metrics",
-    "    8.3 Docker healthcheck",
-    "9. Performance Tuning",
-    "    9.1 JVM settings",
-    "    9.2 Consumer concurrency",
-    "    9.3 Cache sizing",
-    "    9.4 Registry timeout",
-    "10. Security",
-    "    10.1 Container hardening",
-    "    10.2 Network",
-    "11. Solace Cloud Deployment",
-    "12. Troubleshooting",
-]
-
-for entry in toc_entries:
-    p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(2)
-    p.paragraph_format.space_after = Pt(2)
-    if entry.startswith("    "):
-        p.paragraph_format.left_indent = Cm(1.5)
-        run = p.add_run(entry.strip())
-        run.font.size = Pt(10)
-        run.font.color.rgb = RGBColor(0x55, 0x55, 0x55)
-    else:
-        run = p.add_run(entry)
-        run.bold = True
-        run.font.size = Pt(11)
-        run.font.color.rgb = RGBColor(0x2E, 0x40, 0x57)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 1. OVERVIEW
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("1. Overview", level=1)
-
-doc.add_paragraph(
-    "The Schema Validation Micro-Integration (MI) validates messages flowing through "
-    "Solace PubSub+ against JSON schemas stored in the Solace Schema Registry. It operates "
-    "as a message processor: consuming messages from a durable queue, validating against the "
-    "resolved schema, and republishing on the same topic with validation metadata as user properties."
-)
-
-doc.add_paragraph("Key capabilities:")
-add_bullet(doc, "Multi-format validation: JSON Schema, Avro, Protobuf, XSD")
-add_bullet(doc, "Topic-based and header-based schema resolution")
-add_bullet(doc, "Dual-broker support (read from one VPN, write to another)")
-add_bullet(doc, "High Availability with non-exclusive queue binding")
-add_bullet(doc, "Partitioned queue support for ordered processing")
-add_bullet(doc, "Four-level caching (topic resolution, registry metadata, schema bundles, compiled validators)")
-add_bullet(doc, "Hardened container with read-only filesystem, non-root execution, resource limits")
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 2. PREREQUISITES
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("2. Prerequisites", level=1)
-
-add_table(doc,
-    headers=["Component", "Minimum Version", "Notes"],
-    rows=[
-        ["Docker", "24+", "Docker Compose V2 required"],
-        ["Java", "17+", "For building from source"],
-        ["Maven", "3.9+", "For building from source"],
-        ["Solace PubSub+", "10.x+", "Standard or Enterprise Edition"],
-        ["Solace Schema Registry", "3.0+", "With REST API v3"],
-        ["Python", "3.8+", "For helper scripts"],
-    ],
-    col_widths=[Inches(2), Inches(1.5), Inches(3)]
-)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 3. INSTALLATION — SINGLE INSTANCE
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("3. Installation — Single Instance", level=1)
-
-doc.add_heading("3.1 Clone and configure", level=2)
-
-add_code_block(doc, """\
-git clone https://github.com/solacese/schema-validation-micro-integration.git
-cd schema-validation-micro-integration
-cp .env.example .env""")
-
-doc.add_paragraph()
-p = doc.add_paragraph("Edit ")
-run = p.add_run(".env")
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-p.add_run(" with your broker and registry details:")
-
-add_code_block(doc, """\
-SOLACE_INPUT_BROKER=tcp://your-broker:55555
-SOLACE_INPUT_VPN=your-vpn
-SOLACE_INPUT_USERNAME=your-user
-SOLACE_INPUT_PASSWORD=your-password
-SOLACE_OUTPUT_BROKER=tcp://your-broker:55555
-SOLACE_OUTPUT_VPN=your-vpn
-SOLACE_OUTPUT_USERNAME=your-user
-SOLACE_OUTPUT_PASSWORD=your-password
-SCHEMA_REGISTRY_BASE_URL=http://your-registry:8080/apis/registry/v3
-SCHEMA_REGISTRY_USERNAME=sr-readonly
-SCHEMA_REGISTRY_PASSWORD=your-password""")
-
-doc.add_heading("3.2 Build the Docker image", level=2)
-
-add_code_block(doc, "docker compose -f docker-compose.local.yml build")
-
-doc.add_paragraph()
-doc.add_paragraph("For Docker Hardened Image (DHI):")
-
-add_code_block(doc, 'docker build --build-arg RUNTIME_IMAGE=dhi.io/eclipse-temurin:17 -t schema-validation-micro-integration:dhi .')
-
-doc.add_heading("3.3 Start the MI", level=2)
-
-add_code_block(doc, "docker compose -f docker-compose.local.yml up -d")
-
-doc.add_heading("3.4 Verify health", level=2)
-
-add_code_block(doc, "curl http://localhost:8088/actuator/health")
-
-p = doc.add_paragraph("Expected: ")
-run = p.add_run('{"status":"UP"}')
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 4. CONFIGURATION REFERENCE
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("4. Configuration Reference", level=1)
-
-doc.add_heading("4.1 Environment variables", level=2)
-
-add_table(doc,
-    headers=["Variable", "Default", "Description"],
-    rows=[
-        ["SOLACE_INPUT_BROKER", "tcp://solace-broker:55555", "Source broker (SMF, WSS, or TCPS)"],
-        ["SOLACE_INPUT_VPN", "default", "Input message VPN"],
-        ["SOLACE_INPUT_USERNAME", "default", "Input client username"],
-        ["SOLACE_INPUT_PASSWORD", "default", "Input client password"],
-        ["SOLACE_OUTPUT_BROKER", "(same as input)", "Target broker for validated output"],
-        ["SOLACE_OUTPUT_VPN", "(same as input)", "Output message VPN"],
-        ["SOLACE_OUTPUT_USERNAME", "(same as input)", "Output client username"],
-        ["SOLACE_OUTPUT_PASSWORD", "(same as input)", "Output client password"],
-        ["SCHEMA_REGISTRY_BASE_URL", "http://localhost:18081/apis/registry/v3", "Schema Registry REST endpoint"],
-        ["SCHEMA_REGISTRY_USERNAME", "sr-readonly", "Registry basic auth username"],
-        ["SCHEMA_REGISTRY_PASSWORD", "roPassword", "Registry basic auth password"],
-        ["SCHEMA_REGISTRY_REQUEST_TIMEOUT", "3s", "HTTP timeout for registry calls"],
-        ["CONSUMER_CONCURRENCY", "8", "Parallel consumer threads"],
-        ["MAX_PAYLOAD_BYTES", "1048576", "Maximum message payload (bytes)"],
-        ["VALIDATION_TIMEOUT", "5s", "Per-message validation timeout"],
-        ["PARTITION_COUNT", "0", "Partitioned queue (0 = disabled)"],
-        ["PARTITION_REBALANCE_DELAY", "5", "Seconds before partition rebalance"],
-        ["SCHEMA_PREWARM_ENABLED", "true", "Prewarm schema cache on startup"],
-        ["PORT", "8088", "HTTP management port"],
-    ],
-    col_widths=[Inches(2.8), Inches(2.2), Inches(2.5)]
-)
-
-doc.add_heading("4.2 Cache tuning", level=2)
-
-add_table(doc,
-    headers=["Variable", "Default", "Description"],
-    rows=[
-        ["TOPIC_RESOLUTION_TTL", "15m", "How long topic→schema mappings are cached"],
-        ["REGISTRY_LOOKUP_TTL", "60m", "How long registry metadata is cached"],
-        ["SCHEMA_BUNDLE_TTL", "60m", "How long resolved schema bundles are cached"],
-        ["COMPILED_VALIDATOR_TTL", "60m", "How long compiled validators are cached"],
-        ["MAX_TOPIC_CACHE_ENTRIES", "5000", "Max topic resolution cache entries"],
-        ["MAX_REGISTRY_CACHE_ENTRIES", "1000", "Max registry metadata cache entries"],
-        ["MAX_SCHEMA_CACHE_ENTRIES", "1000", "Max schema bundle cache entries"],
-        ["MAX_VALIDATOR_CACHE_ENTRIES", "1000", "Max compiled validator cache entries"],
-    ],
-    col_widths=[Inches(2.8), Inches(1.2), Inches(3.5)]
-)
-
-doc.add_heading("4.3 Topic mappings (application.yml)", level=2)
-
-p = doc.add_paragraph("Topic mappings are configured in ")
-run = p.add_run("src/main/resources/application.yml")
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-p.add_run(" under ")
-run = p.add_run("app.mappings")
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-p.add_run(". Each mapping defines:")
-
-add_bullet(doc, "id: Unique identifier for the mapping")
-add_bullet(doc, "topic-pattern: Solace topic pattern with {capture} groups")
-add_bullet(doc, "schema-group: Schema Registry group name")
-add_bullet(doc, "artifact-id: Schema artifact within the group")
-add_bullet(doc, "artifact-type: JSON, AVRO, PROTOBUF, or XSD")
-add_bullet(doc, "version-strategy: How to resolve the schema version (LATEST_ENABLED, TOPIC_CAPTURE, BRANCH, FIXED)")
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 5. HIGH AVAILABILITY SETUP
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("5. High Availability Setup", level=1)
-
-doc.add_heading("5.1 Architecture", level=2)
-
-doc.add_paragraph(
-    "The MI achieves high availability through Solace's non-exclusive queue binding:"
-)
-add_bullet(doc, "Multiple MI instances bind to the same durable queue")
-add_bullet(doc, "The broker distributes messages across active consumers")
-add_bullet(doc, "If one instance fails, messages are automatically redelivered to surviving instances")
-add_bullet(doc, "Zero message loss during instance failures or rolling restarts")
-
-doc.add_paragraph()
-add_code_block(doc, """\
-Publishers → Topic Subscriptions → Durable Queue (non-exclusive)
-                                      ├── MI Instance 1 (8 threads)
-                                      ├── MI Instance 2 (8 threads)
-                                      └── MI Instance 3 (8 threads)""")
-
-doc.add_heading("5.2 Deploy 3-instance cluster", level=2)
-
-add_code_block(doc, "docker compose -f docker-compose.ha.yml up -d")
-
-doc.add_paragraph()
-doc.add_paragraph("This creates three MI instances:")
-
-add_table(doc,
-    headers=["Instance", "Port", "Container"],
-    rows=[
-        ["MI-1", "8088", "mi-1"],
-        ["MI-2", "8089", "mi-2"],
-        ["MI-3", "8090", "mi-3"],
-    ],
-    col_widths=[Inches(2), Inches(1.5), Inches(2)]
-)
-
-doc.add_paragraph("Override host ports if needed:")
-add_code_block(doc, "MI_1_HOST_PORT=9088 MI_2_HOST_PORT=9089 MI_3_HOST_PORT=9090 docker compose -f docker-compose.ha.yml up -d")
-
-doc.add_heading("5.3 Verify HA cluster", level=2)
-
-doc.add_paragraph("Check all instances are healthy:")
-add_code_block(doc, """\
-curl http://localhost:8088/actuator/health
-curl http://localhost:8089/actuator/health
-curl http://localhost:8090/actuator/health""")
-
-doc.add_heading("5.4 Failover behavior", level=2)
-
-doc.add_paragraph("When an instance stops:")
-p = doc.add_paragraph("1. The broker detects the disconnection (within seconds)")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("2. Messages assigned to that consumer are redelivered to remaining instances")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("3. No messages are lost — the queue holds unacknowledged messages until redelivery")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("4. When the instance recovers, it reconnects and begins receiving new messages")
-p.paragraph_format.left_indent = Cm(0.5)
-
-doc.add_heading("5.5 Rolling restart procedure", level=2)
-
-steps = [
-    "Stop one instance: docker stop mi-1",
-    "Wait for health check to confirm redistribution (10-15 seconds)",
-    "Start the instance: docker start mi-1",
-    "Wait for healthy status: curl http://localhost:8088/actuator/health",
-    "Repeat for next instance",
-]
-for i, step in enumerate(steps, 1):
-    p = doc.add_paragraph(f"{i}. {step}")
-    p.paragraph_format.left_indent = Cm(0.5)
-
-doc.add_heading("5.6 Scaling considerations", level=2)
-
-add_table(doc,
-    headers=["Instances", "Consumer Threads", "Aggregate Throughput"],
-    rows=[
-        ["1", "8", "~1,000-2,000 msg/s"],
-        ["3", "24", "~3,000-5,000 msg/s"],
-        ["5+", "40+", "Limited by broker/registry"],
-    ],
-    col_widths=[Inches(1.5), Inches(2), Inches(3)]
-)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 6. PARTITIONED QUEUE SETUP
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("6. Partitioned Queue Setup", level=1)
-
-doc.add_paragraph("For ordered processing within a partition key:")
-
-add_code_block(doc, "./scripts/provision-partitioned-queue.sh 3")
-
-doc.add_paragraph()
-doc.add_paragraph(
-    "This creates the queue with 3 partitions and adds all required topic subscriptions."
-)
-
-p = doc.add_paragraph("Set the environment variable: ")
-run = p.add_run("PARTITION_COUNT=3")
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-
-doc.add_paragraph()
-doc.add_paragraph(
-    "Messages with the same partition key are always processed by the same consumer, "
-    "ensuring ordering within a partition."
-)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 7. SCHEMA REGISTRY SETUP
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("7. Schema Registry Setup", level=1)
-
-doc.add_heading("7.1 Register schemas", level=2)
-
-add_code_block(doc, "./scripts/register-schemas.sh")
-
-doc.add_paragraph()
-doc.add_paragraph(
-    "This registers the demo schemas (metadata, context-generic, pub-files, pub-table) "
-    "into the manufacturing-iot group."
-)
-
-doc.add_heading("7.2 Custom schemas", level=2)
-
-doc.add_paragraph("To add your own schemas:")
-p = doc.add_paragraph("1. Create the JSON Schema file in schemas/json/your-group/")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("2. Register using the Registry REST API or the registration script as a template")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("3. Add a topic mapping in application.yml")
-p.paragraph_format.left_indent = Cm(0.5)
-p = doc.add_paragraph("4. Restart the MI (or wait for cache expiry)")
-p.paragraph_format.left_indent = Cm(0.5)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 8. MONITORING & HEALTH CHECKS
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("8. Monitoring & Health Checks", level=1)
-
-doc.add_heading("8.1 Endpoints", level=2)
-
-add_table(doc,
-    headers=["Endpoint", "Purpose"],
-    rows=[
-        ["/actuator/health", "Liveness + readiness (includes registry connectivity)"],
-        ["/actuator/metrics", "Micrometer metrics (validation counts, latencies)"],
-        ["/actuator/info", "Build info"],
-        ["/actuator/bindings", "Spring Cloud Stream binding status"],
-    ],
-    col_widths=[Inches(2.5), Inches(4.5)]
-)
-
-doc.add_heading("8.2 Key metrics", level=2)
-
-add_table(doc,
-    headers=["Metric", "Description"],
-    rows=[
-        ["schema.validation.total", "Total messages processed"],
-        ["schema.validation.validated", "Successfully validated messages"],
-        ["schema.validation.rejected", "Messages that failed validation"],
-        ["schema.validation.errors", "Processing errors (registry unreachable, timeout)"],
-        ["schema.validation.duration", "Validation latency histogram"],
-        ["schema.cache.hits / misses", "Cache effectiveness"],
-    ],
-    col_widths=[Inches(2.8), Inches(4.2)]
-)
-
-doc.add_heading("8.3 Docker healthcheck", level=2)
-
-doc.add_paragraph("The container includes a Java-based healthcheck (no shell required):")
-add_bullet(doc, "Interval: 10s")
-add_bullet(doc, "Timeout: 5s")
-add_bullet(doc, "Start period: 45s (allows for JVM warmup)")
-add_bullet(doc, "Retries: 5")
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 9. PERFORMANCE TUNING
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("9. Performance Tuning", level=1)
-
-doc.add_heading("9.1 JVM settings", level=2)
-
-doc.add_paragraph("Default:")
-add_code_block(doc, "-XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError")
-
-doc.add_paragraph()
-doc.add_paragraph("For high-throughput scenarios, increase container memory and let the JVM scale:")
-add_code_block(doc, "mem_limit: 4g")
-
-doc.add_heading("9.2 Consumer concurrency", level=2)
-
-p = doc.add_paragraph("The ")
-run = p.add_run("CONSUMER_CONCURRENCY")
-run.font.name = 'Courier New'
-run.font.size = Pt(9)
-p.add_run(" setting controls parallel processing threads:")
-
-add_bullet(doc, "Default: 8")
-add_bullet(doc, "For high throughput: 16-32")
-add_bullet(doc, "Bound by: registry latency, CPU cores, broker connection limits")
-
-doc.add_heading("9.3 Cache sizing", level=2)
-
-doc.add_paragraph("For large topic spaces (>1000 distinct topics):")
-add_code_block(doc, """\
-MAX_TOPIC_CACHE_ENTRIES=10000
-MAX_REGISTRY_CACHE_ENTRIES=5000
-MAX_SCHEMA_CACHE_ENTRIES=5000
-MAX_VALIDATOR_CACHE_ENTRIES=5000""")
-
-doc.add_heading("9.4 Registry timeout", level=2)
-
-doc.add_paragraph("If the registry is remote or high-latency:")
-add_code_block(doc, """\
-SCHEMA_REGISTRY_REQUEST_TIMEOUT=5s
-REGISTRY_LOOKUP_TTL=120m""")
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 10. SECURITY
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("10. Security", level=1)
-
-doc.add_heading("10.1 Container hardening", level=2)
-
-doc.add_paragraph("The compose files enforce:")
-add_bullet(doc, "Read-only root filesystem (writable: /tmp tmpfs only)")
-add_bullet(doc, "Non-root user (UID 65532)")
-add_bullet(doc, "All capabilities dropped")
-add_bullet(doc, "no-new-privileges")
-add_bullet(doc, "PID limit: 512")
-add_bullet(doc, "CPU limit: 2.0 cores")
-add_bullet(doc, "Memory limit: 2 GB")
-add_bullet(doc, "Automatic restart (unless-stopped)")
-
-doc.add_heading("10.2 Network", level=2)
-
-add_bullet(doc, "Use TLS for broker connections (tcps:// or wss://)")
-add_bullet(doc, "Use HTTPS for Schema Registry")
-add_bullet(doc, "Keep registry credentials in secrets management (Docker secrets or Kubernetes secrets)")
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 11. SOLACE CLOUD DEPLOYMENT
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("11. Solace Cloud Deployment", level=1)
-
-doc.add_paragraph("For Solace Cloud:")
-
-add_code_block(doc, """\
-SOLACE_INPUT_BROKER=wss://your-service.messaging.solace.cloud:443
-SOLACE_INPUT_VPN=your-vpn
-SOLACE_INPUT_USERNAME=solace-cloud-client
-SOLACE_INPUT_PASSWORD=your-password""")
-
-doc.add_paragraph()
-doc.add_paragraph(
-    "The MI automatically handles WSS→SMF translation for SDKPerf tools."
-)
-
-doc.add_page_break()
-
-# ─────────────────────────────────────────────────────────────────────────────
-# 12. TROUBLESHOOTING
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.add_heading("12. Troubleshooting", level=1)
-
-add_table(doc,
-    headers=["Symptom", "Cause", "Solution"],
-    rows=[
-        ["MI won't start (connection refused)", "Broker unreachable", "Verify SOLACE_INPUT_BROKER URL and port"],
-        ["Health check returns DOWN", "Registry unreachable", "Verify SCHEMA_REGISTRY_BASE_URL"],
-        ["Messages not being processed", "Queue not bound", "Check /actuator/bindings for active bindings"],
-        ["PROCESSING_ERROR on all messages", "Schema not registered", "Run register-schemas.sh or check group/artifact names"],
-        ["High latency", "Cache cold / registry slow", "Increase cache TTL, check registry response times"],
-        ["Memory issues", "Cache too large", "Reduce MAX_*_CACHE_ENTRIES or increase mem_limit"],
-    ],
-    col_widths=[Inches(2.3), Inches(2.0), Inches(3.2)]
-)
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Save document
-# ─────────────────────────────────────────────────────────────────────────────
-
-doc.save(OUTPUT_PATH)
-print(f"✅ Document generated: {OUTPUT_PATH}")
+        run.font.name = 'DejaVu Sans Mono'
+        run.font.size = Pt(8)
+
+
+def table(headers, rows):
+    t = doc.add_table(rows=1, cols=len(headers))
+    t.style = 'Light Shading Accent 1'
+    for cell, value in zip(t.rows[0].cells, headers):
+        cell.text = value
+    repeat = OxmlElement('w:tblHeader')
+    t.rows[0]._tr.get_or_add_trPr().append(repeat)
+    for values in rows:
+        for cell, value in zip(t.add_row().cells, values):
+            cell.text = value
+    for row in t.rows:
+        for cell in row.cells:
+            for p in cell.paragraphs:
+                p.paragraph_format.space_after = Pt(4)
+                for r in p.runs:
+                    r.font.size = Pt(9)
+
+
+def page(title):
+    doc.add_page_break()
+    doc.add_heading(title, level=1)
+
+
+doc.add_paragraph('Schema Validation Micro Integration', style='Title')
+doc.add_paragraph('Installation and operations guide', style='Subtitle')
+text('Updated 3 November 2026 | Installation target: Solace Schema Registry 1.1.2 GA')
+text('Validate Solace message payloads against JSON Schema, Avro, Protobuf, and XML Schema artifacts. '
+     'The integration resolves schemas from message properties or topic mappings, validates the payload, '
+     'and republishes it with validation metadata. The same image supports a local demo or existing brokers and registries.')
+heading('Install the complete local stack')
+text('You need Docker with Compose v2 or later, Python 3.9 or later, and curl. Java 17 and Maven are included '
+     'in the container build; no host Java installation is required. Start Docker Desktop and sign in if your organization requires it.')
+text('1. Download schema-registry-v1.1.2.tar.gz and its .md5 file from the Solace Products portal. '
+     'Leave them compressed in your Downloads folder. Solace portal access is required.')
+text('2. From the repository directory, run:')
+code('./scripts/install.sh')
+text('Setup prepares the release runtime, starts PostgreSQL, the embedded identity provider and registry API, '
+     'starts a local broker, registers the sample schemas, builds the integration, and waits for healthy services. '
+     'Re-running setup reuses the prepared files and existing schemas. Initial setup needs internet access for images and dependencies.')
+text('For an archive elsewhere:')
+code('SCHEMA_REGISTRY_DIST=/path/to/schema-registry-v1.1.2.tar.gz ./scripts/install.sh')
+table(['Service', 'Local address'], [
+    ['Integration health', 'http://localhost:8088/actuator/health'],
+    ['Schema Registry API', 'http://localhost:18081/apis/registry/v3'],
+    ['Broker management', 'http://localhost:8080 (admin / admin)'],
+])
+text('The local registry runs Java and Node application files from the licensed package on Apple Silicon or x86. '
+     'This API stack does not include the registry web console.')
+
+page('Validate all four schema formats')
+table(['Registry type', 'Payload', 'Dependencies'], [
+    ['JSON', 'UTF-8 JSON', 'Registry references resolve $ref names'],
+    ['XML or XSD', 'XML against XSD 1.0', 'Registry-backed include and import'],
+    ['AVRO', 'One raw binary Avro datum', 'Referenced named types'],
+    ['PROTOBUF', 'Raw binary Protobuf message', 'Reference names match import paths'],
+])
+text('JSON uses the explicit $schema dialect, or 2020-12 when absent. XML external DTDs and remote schemas are blocked; '
+     'register dependencies as registry references. Protobuf validates wire decodability: proto3 permits missing scalar '
+     'fields and unknown fields. Avro container files and serializer-specific envelopes, such as a Confluent '
+     'magic-byte/schema-ID prefix, must be decoded before ingress.')
+heading('Select the schema using message properties')
+code('schema_group = manufacturing-iot\nschema_name = pub-files\nschema_version = 1.0.0')
+text('The version is optional; without it the most recently created enabled version is selected. '
+     'The integration discovers the format from registry metadata. These properties take priority over topic mappings. '
+     'The ingress queue must subscribe to the publisher topic.')
+heading('Register your own schemas')
+text('The helper infers the artifact type from .json, .avsc, .xsd, or .proto. Use --type to override. '
+     'Set SCHEMA_REGISTRY_BASE_URL, SCHEMA_REGISTRY_USERNAME, and SCHEMA_REGISTRY_PASSWORD in the host shell for a remote registry. '
+     'Registration requires a developer account; the integration itself can use a readonly account.')
+code('python3 scripts/register-schema.py sensor.xsd --artifact sensor\n'
+     'python3 scripts/register-schema.py reading.avsc --artifact reading\n'
+     'python3 scripts/register-schema.py reading.proto --artifact reading --references refs.json')
+text('Optional flags: --group (default: default), --version (default: 1.0.0), and --references. '
+     'The references file contains a v3 JSON array of groupId, artifactId, version, and name objects. '
+     'Register dependencies first and create a custom group before adding its first artifact. Duplicate versions fail; choose a new version.')
+text('For Protobuf, select the root message using // @root fully.qualified.MessageName on the first nonempty schema line. '
+     'Otherwise the first declared message is selected. Reference names must match the import statements, including directory paths.')
+heading('Try the manufacturing demo')
+code('./scripts/demo-publish.sh pub-files valid\n./scripts/demo-publish.sh pub-files invalid\n./scripts/demo-publish.sh all')
+text('The sample JSON schemas and payloads are in schemas/json/mqtt-envelope and samples/json. '
+     'The checksum rule checks the declared hash format; it does not retrieve files and recompute their contents.')
+
+page('Connect existing services and configure routing')
+heading('Install only the integration')
+code('cp .env.example .env\n'
+     '# Edit broker and registry variables in .env\n'
+     'docker compose -f docker-compose.local.yml up -d --build\n'
+     'curl --fail http://localhost:8088/actuator/health')
+text('Set SOLACE_INPUT_BROKER, SOLACE_INPUT_VPN, SOLACE_INPUT_USERNAME, and SOLACE_INPUT_PASSWORD. '
+     'Set the corresponding SOLACE_OUTPUT variables for the target broker. Use a registry URL ending in /apis/registry/v3. '
+     'From Docker, use host.docker.internal to reach a registry running on this Mac.')
+text('The default subscriptions cover the manufacturing demo. Mount optional overrides in config/application.yml '
+     'and configure app.ingress.topic-subscriptions for your own topic space. Publishers can declare schemas in properties, '
+     'or app.mappings can select schemas from topic patterns.')
+heading('Configure topic mappings when needed')
+code('app:\n'
+     '  ingress:\n'
+     '    topic-subscriptions: ["sensors/>"]\n'
+     '  mappings:\n'
+     '    - id: sensor-reading\n'
+     '      topic-pattern: sensors/{site}/{device}\n'
+     '      schema-group: default\n'
+     '      artifact-id: sensor\n'
+     '      artifact-type: XSD\n'
+     '      version-strategy:\n'
+     '        type: LATEST_ENABLED')
+text('Version strategies are LATEST_ENABLED, FIXED, TOPIC_CAPTURE, and BRANCH. '
+     'The README describes their syntax, topic captures, and cache configuration.')
+heading('Route by validation outcome')
+text('By default, output uses the original topic. User property mi_validation_status is VALIDATED, REJECT, or PROCESSING_ERROR. '
+     'The integration skips messages already carrying a validation status to prevent republish loops.')
+text('For separate output topics, including MQTT 3.1.1 consumers without user properties, set:')
+code('VALIDATED_TOPIC_TEMPLATE=validated/{originalTopic}\n'
+     'REJECT_TOPIC_TEMPLATE=rejected/{originalTopic}\n'
+     'PROCESSING_ERROR_TOPIC_TEMPLATE=errors/{originalTopic}')
+text('These prefixes sit outside the example ingress subscriptions. Templates also support {outcome}, {schemaVersion}, '
+     '{mappingId}, and named captures. Configure the outcome vocabulary through OUTCOME_LABEL_VALIDATED, '
+     'OUTCOME_LABEL_REJECT, and OUTCOME_LABEL_PROCESSING_ERROR. Ensure output topics do not feed another validating pipeline unintentionally.')
+
+page('Operate and scale the integration')
+heading('Health and observability')
+code('curl --fail http://localhost:8088/actuator/health\n'
+     'curl --fail http://localhost:8088/actuator/metrics\n'
+     'docker logs --tail 100 schema-validation-micro-integration')
+text('A healthy instance reports status UP. Registry lookup failures are surfaced by the health indicator. '
+     'Message outcomes include schema coordinates, format, timestamp, failure category, failure reason, original topic, mapping ID, '
+     'and trace ID as user properties. The input payload is preserved.')
+heading('Limits and caching')
+table(['Variable', 'Default', 'Purpose'], [
+    ['CONSUMER_CONCURRENCY', '8', 'Parallel queue consumers'],
+    ['MAX_PAYLOAD_BYTES', '1048576', 'Maximum input payload size'],
+    ['VALIDATION_TIMEOUT', '5s', 'Time limit for payload validation'],
+    ['SCHEMA_REGISTRY_REQUEST_TIMEOUT', '3s', 'HTTP request timeout'],
+    ['PARTITION_COUNT', '0', 'Use a pre-provisioned partitioned queue when positive'],
+])
+text('Topic resolution, registry lookups, schema bundles, and compiled validators are cached. '
+     'Compose uses a longer registry lookup TTL for the demo. Schema changes and state changes may remain cached until TTL expiry; '
+     'shorten TTLs or restart the integration when immediate freshness is required. Size concurrency, resources, and TTLs using workload measurements.')
+heading('Run three instances')
+code('docker compose -f docker-compose.local.yml stop\n'
+     'docker compose -f docker-compose.ha.yml up -d')
+text('The three instances share a nonexclusive queue and expose health on ports 8088, 8089, and 8090. '
+     'Override MI_1_HOST_PORT, MI_2_HOST_PORT, and MI_3_HOST_PORT if required. '
+     'Stop the HA instances before resuming the single-instance stack.')
+text('Partitioned queues must be provisioned separately through the supplied SEMP helper before starting consumers. '
+     'Changing partition count can require recreation and lose queued messages; never use the helper to resize a live queue without a deliberate migration.')
+heading('Stop the local stack')
+code('./scripts/demo-teardown.sh')
+text('Teardown stops and removes demo service containers, preserves registry data volumes, and leaves the shared network. '
+     'Back up an existing registry using the release package instructions before upgrading it. This project does not automatically migrate or roll back an existing registry database.')
+
+page('Verify an installation and maintain the project')
+heading('Build and automated checks')
+text('For development outside Docker, use Java 17 or later and Maven 3.9 or later. Verify that mvn -version shows the intended JDK. '
+     'The verification command checks shell syntax, archive extraction, checksums, Spring application startup, resolution, routing, and validators.')
+code('./scripts/verify.sh')
+text('CI runs Java 17, 21, and 25 and builds the Docker image. Dependencies are managed using the Solace MDK 4.3.11 platform '
+     'and Spring Boot 4.1.2. The custom validator uses the Solace Spring Cloud Stream binder directly; the stock connector workflow runtime '
+     'is intentionally absent because it owns the same processing channels.')
+heading('Run live registry and broker checks')
+text('Run against a disposable registry. The tests create unique mi-compat groups and leave them for inspection. '
+     'Set MI_REGISTRY_TEST_USERNAME and MI_REGISTRY_TEST_PASSWORD for credentials other than the local developer defaults.')
+code('MI_REGISTRY_TEST_URL=http://localhost:18081/apis/registry/v3 \\\n'
+     'MI_BROKER_TEST_URL=tcp://localhost:55554 ./scripts/verify.sh')
+text('With the broker URL set, tests publish valid and invalid payloads for JSON, XML, Avro, and Protobuf through the running integration '
+     'and verify returned status and format metadata. Optional broker settings are MI_BROKER_TEST_VPN, MI_BROKER_TEST_USERNAME, and '
+     'MI_BROKER_TEST_PASSWORD. The running integration must use the same registry and broker and subscribe to the default demo topic space.')
+heading('Performance and delivery guarantees')
+text('The performance directory contains SDKPerf throughput, backpressure, and HA scenarios. SDKPerf JCSMP is a separate download. '
+     'These are workload experiments; this guide makes no production throughput, global ordering, exactly-once, or zero-loss claim. '
+     'A durable queue and multiple consumers provide recovery mechanisms, but delivery behavior must be qualified under failure and load for the intended deployment.')
+heading('Identify the registry release correctly')
+text('Installation targets schema-registry-v1.1.2.tar.gz from the 1.1.2 GA portal. The verified package currently reports version 1.1.1 '
+     'from /system/info. Its internal runner is named with 3.0.7-SNAPSHOT; that name is not the Solace product release. '
+     'Preserve the downloaded archive and checksum when identifying this installation.')
+text('The runtime is prepared under .runtime/schema-registry/1.1.2 and excluded from Git and the Docker build context. '
+     'Use SCHEMA_REGISTRY_DIST for an alternate archive path and SCHEMA_REGISTRY_RUNTIME_DIR for an alternate prepared directory.')
+heading('Sources and further configuration')
+text('The repository README is the detailed configuration reference. Release downloads: '
+     'https://products.solace.com/products/1.1.2GA/Schema_Registry/solace-schema-registry/')
+text('Official deployment and backup guidance: '
+     'https://docs.solace.com/Schema-Registry/deploying-schema-registry-docker.htm')
+
+doc.core_properties.title = 'Schema Validation Micro Integration Installation and Operations Guide'
+doc.core_properties.subject = 'Solace Schema Registry 1.1.2 GA'
+doc.core_properties.author = 'Solace'
+doc.save(OUTPUT)
+print(OUTPUT)

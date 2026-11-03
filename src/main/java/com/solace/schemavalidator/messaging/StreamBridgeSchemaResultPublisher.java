@@ -1,6 +1,5 @@
 package com.solace.schemavalidator.messaging;
 
-import com.solace.connector.core.io.header.ConnectorBinderHeaders;
 import com.solace.spring.cloud.stream.binder.messaging.SolaceBinderHeaders;
 import java.util.Map;
 import org.springframework.cloud.stream.binder.BinderHeaders;
@@ -23,7 +22,7 @@ public class StreamBridgeSchemaResultPublisher implements SchemaResultPublisher 
     public void publish(String topic, byte[] payload, Map<String, Object> headers) {
         MessageBuilder<byte[]> builder = MessageBuilder.withPayload(payload)
             .setHeader(BinderHeaders.TARGET_DESTINATION, topic)
-            .setHeader(ConnectorBinderHeaders.TARGET_DESTINATION_TYPE, "topic");
+            .setHeader(SolaceBinderHeaders.TARGET_DESTINATION_TYPE, "topic");
         headers.forEach(builder::setHeader);
         Object partitionKey = headers.get(SolaceBinderHeaders.PARTITION_KEY);
         if (partitionKey == null) {

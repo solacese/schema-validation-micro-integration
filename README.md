@@ -1,277 +1,129 @@
 # Schema Validation Micro-Integration
 
-A Solace MDK micro-integration that validates IoT messages against JSON schemas from Solace Schema Registry. Messages are republished on the **same topic** with validation outcome and schema metadata carried as **message user properties**.
+[![Verify](https://github.com/solacese/schema-validation-micro-integration/actions/workflows/verify.yml/badge.svg)](https://github.com/solacese/schema-validation-micro-integration/actions/workflows/verify.yml)
+[![Release](https://img.shields.io/github/v/release/solacese/schema-validation-micro-integration)](https://github.com/solacese/schema-validation-micro-integration/releases/latest)
 
-Built for manufacturing IoT MQTT flows with dual-broker support (read from one VPN, write to another).
+Validate **JSON Schema, XML Schema, Avro, and Protobuf** messages using **Solace Schema Registry 1.1.2 GA**. Resolve schemas from message properties or topic mappings, validate the payload, and republish it with the outcome and schema metadata. Supports one broker, separate input/output brokers, and multiple instances sharing a queue.
 
-## Quick Start
+## Install a release
 
-**Prerequisites:** Docker, Maven, Java 17+
+**Requirements:** Docker with Compose v2+, Python 3.9+, and curl. Release bundles contain prebuilt Java artifacts; no local Java, Maven, or application compilation is needed for Docker installation.
 
-```bash
-./scripts/demo-setup.sh
-```
-
-This starts everything in one command:
-
-| Service             | URL                              |
-|---------------------|----------------------------------|
-| Schema Registry     | http://localhost:18081            |
-| Solace Broker       | http://localhost:8080 (admin/admin) |
-| Micro-Integration   | http://localhost:8088             |
-
-## Try It
+1. Download `schema-registry-v1.1.2.tar.gz` and its `.md5` file from [Solace Products](https://products.solace.com/products/1.1.2GA/Schema_Registry/solace-schema-registry/) into your Downloads folder. Leave them compressed.
+2. Start Docker Desktop and sign in if required by your organization.
+3. Download and install this integration:
 
 ```bash
-# Terminal 1 — watch output in real time
-./scripts/demo-live.sh
-
-# Terminal 2 — publish test messages
-./scripts/demo-publish.sh pub-files valid       # validated
-./scripts/demo-publish.sh pub-files invalid     # rejected (missing message_id)
-./scripts/demo-publish.sh bad-checksum          # rejected (bad sha-256)
-./scripts/demo-publish.sh all                   # all 12 scenarios
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.0/schema-validation-micro-integration-1.0.0.tar.gz
+curl -fLO https://github.com/solacese/schema-validation-micro-integration/releases/download/v1.0.0/SHA256SUMS
+# Compare the archive's SHA-256 with the matching entry in SHA256SUMS.
+shasum -a 256 schema-validation-micro-integration-1.0.0.tar.gz
+tar -xzf schema-validation-micro-integration-1.0.0.tar.gz
+cd schema-validation-micro-integration-1.0.0
+./scripts/install.sh
 ```
 
-Run `./scripts/demo-publish.sh` with no args to see all available scenarios.
+Setup prepares the registry runtime, starts PostgreSQL and the identity provider, starts the broker, registers sample schemas, and starts the MI. It waits for healthy services and can be re-run. For an archive elsewhere, set `SCHEMA_REGISTRY_DIST=/path/to/schema-registry-v1.1.2.tar.gz` before installing. Public base images still require network access on first installation. The licensed registry distribution is downloaded separately and is not redistributed in this release.
 
-### Stress Test
+| Service | Address |
+|---|---|
+| MI health | [localhost:8088/actuator/health](http://localhost:8088/actuator/health) |
+| Registry API | [localhost:18081/apis/registry/v3/system/info](http://localhost:18081/apis/registry/v3/system/info) |
+| Broker management | [localhost:8080](http://localhost:8080), local demo login `admin` / `admin` |
 
-Send sustained load and watch throughput in real time:
+The local API stack works on Apple Silicon and x86. It does not include the registry web console.
+
+## Use existing services
+
+From a release bundle or source checkout:
 
 ```bash
-# Terminal 1 — live throughput monitor (one line per second)
-./scripts/demo-monitor.sh
-
-# Terminal 2 — stress test: 1000 msg/sec for 60 seconds
-./scripts/demo-stress.sh              # defaults: 1000 msg/sec, 60s
-./scripts/demo-stress.sh 2000 30      # 2000 msg/sec for 30s
+cp .env.example .env
+# Set SOLACE_INPUT_*, SOLACE_OUTPUT_*, and SCHEMA_REGISTRY_* in .env.
+./scripts/install.sh --existing
 ```
 
-`demo-stress.sh` includes a built-in monitor. Use `demo-monitor.sh` separately when running your own publishers or the SDKPerf performance suite.
+Point `SCHEMA_REGISTRY_BASE_URL` at an endpoint ending in `/apis/registry/v3`, reachable from Docker. Use `host.docker.internal` for a registry on this Mac. Mount optional configuration as `config/application.yml`. Change `app.ingress.topic-subscriptions` from the manufacturing demo defaults to your own topics.
 
-## How It Works
-
-```
-                              ┌──────────────────────────┐
-  Publishers ──> Topics ──>   │  Queue (durable)         │
-                              │  8 consumer threads       │
-                              └──────────┬───────────────┘
-                                         │
-                              ┌──────────▼───────────────┐
-                              │  1. Resolve schema       │
-                              │  2. Fetch from registry  │
-                              │  3. Validate payload     │
-                              │  4. Republish on same    │
-                              │     topic + metadata     │
-                              └──────────────────────────┘
-```
-
-By default the output message is published on the **same topic** as the input, and the validation result is conveyed entirely via user properties. When the output topic must differ from the input topic — or must itself carry the result (see [Output Topic Routing](#output-topic-routing)) — the routing templates can rewrite the topic per outcome.
-
-The validation result is conveyed via user properties:
-
-| User Property            | Example                          |
-|--------------------------|----------------------------------|
-| `mi_validation_status`   | `VALIDATED`, `REJECT`, `PROCESSING_ERROR` |
-| `mi_schema_group`        | `manufacturing-iot`              |
-| `mi_schema_artifact`     | `pub-files`                      |
-| `mi_schema_version`      | `1`                              |
-| `mi_schema_type`         | `JSON`                           |
-| `mi_validation_timestamp`| `2026-04-09T10:30:00Z`           |
-| `mi_failure_category`    | `NONE`, `VALIDATION`, `MAPPING`, `REGISTRY` |
-| `mi_failure_reason`      | _(empty on success)_             |
-| `mi_original_topic`      | `Acme/SA/PMNO-001/.../PUB_FILES` |
-| `mi_mapping_id`          | `acme-datascience-eqt-pub-files` |
-| `mi_trace_id`            | _(UUID or propagated)_           |
-
-### Output Topic Routing
-
-Each validation outcome has its own configurable output-topic template, so the publish topic can differ from the consumed topic and can encode the result directly in the topic. This is essential for **single-broker deployments** and for clients on protocols without user-property/header support (e.g. **MQTT 3.1.1**), where consumers must subscribe based on the validation result rather than a message property.
-
-Templates support these placeholders:
-
-| Placeholder        | Value                                                        |
-|--------------------|--------------------------------------------------------------|
-| `{originalTopic}`  | The consumed topic, verbatim                                 |
-| `{outcome}`        | Configurable outcome label (`valid` / `invalid` / `error`)   |
-| `{schemaVersion}`  | Resolved schema version                                      |
-| `{mappingId}`      | Id of the resolved topic mapping                             |
-| `{<capture>}`      | Any named capture group from the matched topic pattern       |
-
-Configure per-outcome templates and the labels substituted for `{outcome}`:
-
-```yaml
-app:
-  routing:
-    validated-topic-template: "{originalTopic}/{outcome}"
-    reject-topic-template: "{originalTopic}/{outcome}"
-    processing-error-topic-template: "{originalTopic}/{outcome}"
-    outcome-labels:
-      validated: valid       # or VALID / Valid / V
-      reject: invalid        # or INVALID / Invalid / I
-      processing-error: error # or ERROR / Error / E
-```
-
-Examples (input → output):
-
-```
-acme/site1/line2/motor3/temperature4/raw/degrees  ->  acme/site1/line2/motor3/temperature4/valid/degrees
-Acme/Site1/Line2/Motor3/Temperature4              ->  Acme/Site1/Line2/Motor3/Temperature4/Invalid
-```
-
-The mid-topic example uses a topic pattern with captures, e.g. `acme/{site}/{line}/{motor}/{sensor}/raw/{unit}` matched on ingress, then `acme/{site}/{line}/{motor}/{sensor}/{outcome}/{unit}` as the template. All three templates default to `{originalTopic}` (same-topic republish) for backward compatibility.
-
-Environment-variable overrides: `VALIDATED_TOPIC_TEMPLATE`, `REJECT_TOPIC_TEMPLATE`, `PROCESSING_ERROR_TOPIC_TEMPLATE`, `OUTCOME_LABEL_VALIDATED`, `OUTCOME_LABEL_REJECT`, `OUTCOME_LABEL_PROCESSING_ERROR`.
-
-### Schema Resolution
-
-Schemas are resolved in priority order:
-
-1. **Header-based** (publisher-declared) -- set `schema_group`, `schema_name`, and optionally `schema_version` as Solace user properties on the message
-2. **Topic-based** (fallback) -- the message topic is matched against patterns configured in `application.yml`
-
-### Version Strategies
-
-| Strategy         | Description                                      |
-|------------------|--------------------------------------------------|
-| `LATEST_ENABLED` | Latest enabled version in the registry (default) |
-| `TOPIC_CAPTURE`  | Extracted from a topic capture group              |
-| `BRANCH`         | Registry branch lookup from topic capture         |
-| `FIXED`          | Hardcoded version in config                       |
-
-### Caching
-
-Four-level cache prevents repeated registry calls:
-
-| Cache              | Default TTL | Max Entries |
-|--------------------|-------------|-------------|
-| Topic resolution   | 15 min      | 5,000       |
-| Registry metadata  | 60 min      | 1,000       |
-| Schema bundles     | 60 min      | 1,000       |
-| Compiled validators| 60 min      | 1,000       |
-
-## Schemas
-
-Four JSON Schema artifacts in the `manufacturing-iot` group (JSON Schema 2020-12):
-
-| Artifact          | Purpose                                 | Dependencies              |
-|-------------------|-----------------------------------------|---------------------------|
-| `metadata`        | Timestamp, message_id, seq, topic       | --                        |
-| `context-generic` | Flexible business context               | --                        |
-| `pub-files`       | File transfers with checksum validation | metadata, context-generic |
-| `pub-table`       | Tabular sensor data (rows/columns)      | metadata, context-generic |
-
-Source files in `schemas/json/mqtt-envelope/`. Sample payloads in `samples/json/`.
-
-## Configuration
-
-### Environment
+A container image is also published for `linux/amd64` and `linux/arm64`:
 
 ```bash
-cp .env.example .env   # local broker defaults -- edit for Solace Cloud
+docker pull ghcr.io/solacese/schema-validation-micro-integration:1.0.0
 ```
 
-Key variables:
-
-| Variable                 | Default                   | Description                      |
-|--------------------------|---------------------------|----------------------------------|
-| `SOLACE_INPUT_BROKER`    | `tcp://solace-broker:55555` | Source broker connection        |
-| `SOLACE_OUTPUT_BROKER`   | _(same as input)_         | Target broker (dual-broker mode) |
-| `SCHEMA_REGISTRY_BASE_URL` | `http://...:8080/apis/registry/v3` | Schema Registry endpoint |
-| `CONSUMER_CONCURRENCY`   | `8`                       | Parallel consumer threads        |
-| `MAX_PAYLOAD_BYTES`      | `1048576`                 | Max message size (1 MB)          |
-| `VALIDATION_TIMEOUT`     | `5s`                      | Timeout per validation           |
-| `PARTITION_COUNT`        | `0`                       | Partitioned queue (0 = disabled) |
-
-### Docker Compose Files
-
-| File                                | Purpose                                   |
-|-------------------------------------|-------------------------------------------|
-| `docker-compose.broker.yml`         | Local Solace PubSub+ broker               |
-| `docker-compose.registry-native.yml`| Schema Registry (Postgres + IDP + backend)|
-| `docker-compose.local.yml`          | MI -- single instance                     |
-| `docker-compose.ha.yml`             | MI -- 3-instance HA cluster               |
-
-### Hardened Image
-
-The Dockerfile is ready for a Docker Hardened Image runtime. Local development uses the public Temurin JRE by default; build with DHI after authenticating the Docker client to `dhi.io`:
+For Java deployments, the release includes an executable JAR. With **Java 17+** and connection settings exported in the shell:
 
 ```bash
-docker build \
-  --build-arg RUNTIME_IMAGE=dhi.io/eclipse-temurin:17 \
-  -t schema-validation-micro-integration:dhi .
+java -jar lib/schema-validation-micro-integration.jar \
+  --spring.config.additional-location=optional:file:./config/
 ```
 
-The runtime runs as UID/GID `65532`, uses cgroup-aware JVM sizing, includes a shell-free Java healthcheck, and the compose files run with a read-only filesystem, dropped capabilities, `no-new-privileges`, `/tmp` tmpfs, process/memory/CPU limits, and restart policies.
+## Supported formats
 
-### Topic Subscriptions
+| Registry type | Payload | References |
+|---|---|---|
+| `JSON` | UTF-8 JSON, explicit `$schema` dialect or 2020-12 by default | Registry-backed `$ref` |
+| `XML` / `XSD` | XML against XSD 1.0, including declared XML encodings | Registry-backed includes/imports |
+| `AVRO` | One raw binary datum | Referenced named types |
+| `PROTOBUF` | Raw binary message; proto2 required fields are checked | Imports, well-known types, explicit root selection |
 
-The MI subscribes to the manufacturing IoT topic space:
+The original payload is preserved. Avro container files and serializer-specific envelopes, including Confluent magic-byte/schema-ID framing, must be decoded before ingress. Proto3 permits missing scalar fields and unknown fields. XML external DTDs and remote schemas are blocked; register dependencies as references.
 
+Messages can select any supported format using these user properties:
+
+```text
+schema_group = manufacturing-iot
+schema_name = pub-files
+schema_version = 1.0.0
 ```
-{ENTERPRISE}/{SITE}/{PMNO}/{CATEGORY}/{PROTOCOL}/{SOURCE}/{MESSAGE}
-```
 
-16 mappings cover all combinations of Acme/Apex, DATASCIENCE/SHOPFLOOR, FromEqt/FromSI, PUB_FILES/PUB_TABLE. See `application.yml` for the full list.
+`schema_version` is optional; by default the most recently created enabled version is selected. The registry determines the format. Without schema properties, topic mappings select the artifact. Output defaults to the original topic, with `mi_validation_status` set to `VALIDATED`, `REJECT`, or `PROCESSING_ERROR`. Configurable topic templates can route each outcome separately, including for MQTT clients without user properties.
 
-## Performance Testing
+## Try the demo
 
 ```bash
-./performance/run-all.sh
+./scripts/demo-publish.sh pub-files valid
+./scripts/demo-publish.sh pub-files invalid
+./scripts/demo-publish.sh all
+./scripts/demo-teardown.sh  # stop services; preserve registry data
 ```
 
-| Test                          | What it measures                           |
-|-------------------------------|--------------------------------------------|
-| `test-throughput.sh`          | Burst throughput (1k, 5k messages)         |
-| `test-sustained-rate.sh`     | Steady state (100, 500, 1000 msg/sec)      |
-| `test-stress-mixed-validity.sh` | 99% valid / 1% invalid at 30k messages  |
-| `test-backpressure.sh`       | 50k message flood with 6 publishers        |
-
-### HA Tests
+Register your own schema using the file extension, or specify `--type`:
 
 ```bash
-docker compose -f docker-compose.ha.yml up -d
-./performance/test-ha-distribution.sh      # load balance across 3 instances
-./performance/test-ha-failover.sh          # kill one instance, verify zero loss
-./performance/test-ha-rolling-restart.sh   # restart during load
+python3 scripts/register-schema.py sensor.xsd --artifact sensor --version 1.0.0
+python3 scripts/register-schema.py reading.avsc --artifact reading --version 1.0.0
+python3 scripts/register-schema.py reading.proto --artifact reading --references refs.json
 ```
 
-Requires SDKPerf JCSMP -- see `performance/README.md`.
-If a host port is already in use, override `MI_1_HOST_PORT`, `MI_2_HOST_PORT`, or `MI_3_HOST_PORT`; the container ports remain 8088, 8089, and 8090.
+For remote registration, export `SCHEMA_REGISTRY_BASE_URL`, `SCHEMA_REGISTRY_USERNAME`, and `SCHEMA_REGISTRY_PASSWORD` in the host shell. Use a developer account. Register dependencies first; reference objects contain `groupId`, `artifactId`, `version`, and `name`.
 
-## Scripts
+## Develop and verify
 
-| Script                          | Purpose                                    |
-|---------------------------------|--------------------------------------------|
-| `demo-setup.sh`                 | Start everything, seed schemas, verify health |
-| `demo-teardown.sh`              | Stop all containers                        |
-| `demo-live.sh`                  | Live subscriber for MI output              |
-| `demo-publish.sh`               | Publish test messages (12 scenarios)       |
-| `demo-stress.sh`                | Stress test with built-in live monitor     |
-| `demo-monitor.sh`               | Standalone throughput monitor (1 line/sec) |
-| `register-schemas.sh`           | Seed manufacturing-iot schemas into registry |
-| `provision-partitioned-queue.sh`| Create partitioned queue via SEMP          |
-
-## Project Structure
-
-```
-src/main/java/com/solace/schemavalidator/
-  config/          Configuration, ingress subscriptions, caches
-  messaging/       Validation orchestration, routing, publishing
-  resolution/      Topic pattern matching, version strategies
-  registry/        HTTP client, caching wrapper, schema bundle loading
-  validation/      JSON / Avro / Protobuf / XSD validator factories
-  observability/   Metrics, health indicator, trace ID propagation
-
-schemas/           JSON Schema artifacts (manufacturing-iot group)
-samples/           Test payloads (valid + invalid per scenario)
-performance/       SDKPerf-based performance and HA tests
-scripts/           Setup, demo, and provisioning scripts
-```
-
-## Teardown
+Use Java 17+ and Maven 3.9+ for source builds. Docker source builds include their own toolchain.
 
 ```bash
-./scripts/demo-teardown.sh
+git clone https://github.com/solacese/schema-validation-micro-integration.git
+cd schema-validation-micro-integration
+./scripts/verify.sh
+./scripts/install.sh
 ```
+
+CI checks Java 17, 21, and 25, shell/Python helpers, Compose configuration, and the Docker build. Opt into live tests against a disposable registry and a running MI using the default demo topic space:
+
+```bash
+MI_REGISTRY_TEST_URL=http://localhost:18081/apis/registry/v3 \
+MI_BROKER_TEST_URL=tcp://localhost:55554 ./scripts/verify.sh
+```
+
+Live tests create a unique `mi-compat-*` group and verify valid/invalid round trips for every supported format. SDKPerf load and HA scenarios are separate from these functional checks; production throughput and delivery guarantees require workload qualification.
+
+## Documentation and releases
+
+- [Configuration, routing, caching, HA, and performance](docs/CONFIGURATION.md)
+- [Installation and operations guide](docs/Schema-Validation-MI-Installation-Guide.docx)
+- [Release history](CHANGELOG.md) and [release packaging](docs/RELEASING.md)
+- [GitHub Releases](https://github.com/solacese/schema-validation-micro-integration/releases) — installation archives, executable JAR, SHA-256 checksums, and dependency SBOMs
+- [Container package](https://github.com/solacese/schema-validation-micro-integration/pkgs/container/schema-validation-micro-integration)
+
+The target is the **1.1.2 GA distribution**. Its verified backend currently reports `1.1.1` from `/system/info`; preserve the original archive/checksum to identify the package. The internal `3.0.7-SNAPSHOT` runner name is not the product version. Runtime files, credentials, and downloaded vendor packages are excluded from Git and release bundles. Existing registry databases must follow the vendor's upgrade/backup procedure.

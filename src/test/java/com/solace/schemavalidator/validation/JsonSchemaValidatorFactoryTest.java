@@ -1,6 +1,6 @@
 package com.solace.schemavalidator.validation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.solace.schemavalidator.registry.ArtifactReference;
 import com.solace.schemavalidator.registry.SchemaBundle;
 import com.solace.schemavalidator.registry.SchemaDocument;
@@ -43,7 +43,7 @@ class JsonSchemaValidatorFactoryTest {
             pubFiles.coordinate(), pubFiles
         ), List.of(metadata, context, pubFiles));
 
-        CompiledValidator validator = new JsonSchemaValidatorFactory(new ObjectMapper()).compile(bundle);
+        CompiledValidator validator = new JsonSchemaValidatorFactory(tools.jackson.databind.json.JsonMapper.builder().build()).compile(bundle);
 
         assertThat(validator.validate(validPayload()).valid()).isTrue();
         assertThat(validator.validate(invalidPayload()).valid()).isFalse();

@@ -12,27 +12,21 @@ if [[ ! -f "${ROOT_DIR}/.env" ]]; then
   exit 1
 fi
 
-set -a
-source "${ROOT_DIR}/.env"
-set +a
+source "${ROOT_DIR}/scripts/lib/env.sh"
+load_project_env
 
-: "${URL:?Missing URL in .env}"
-: "${VPN:?Missing VPN in .env}"
-: "${USER:?Missing USER in .env}"
-: "${PWD:?Missing PWD in .env}"
 
 # PrettyDump subscribes to the OUTPUT broker (where validated messages land)
 # PrettyDump uses JCSMP (SMF), so translate wss:// cloud URLs to tcps:// SMF
-PRETTY_URL="${SOLACE_OUTPUT_BROKER:-${URL}}"
-PRETTY_URL="${PRETTY_URL//solace-broker/localhost}"
-PRETTY_URL="${PRETTY_URL//55555/55554}"
+PRETTY_URL="${SOLACE_OUTPUT_BROKER:-tcp://solace-broker:55555}"
+PRETTY_URL="$(host_smf_url "${PRETTY_URL}")"
 if [[ "${PRETTY_URL}" == wss://* ]]; then
   PRETTY_URL="${PRETTY_URL/wss:\/\//tcps://}"
   PRETTY_URL="${PRETTY_URL/:443/:55443}"
 fi
-PRETTY_VPN="${SOLACE_OUTPUT_VPN:-${VPN}}"
-PRETTY_USER="${SOLACE_OUTPUT_USERNAME:-${USER}}"
-PRETTY_PASS="${SOLACE_OUTPUT_PASSWORD:-${PWD}}"
+PRETTY_VPN="${SOLACE_OUTPUT_VPN:-default}"
+PRETTY_USER="${SOLACE_OUTPUT_USERNAME:-default}"
+PRETTY_PASS="${SOLACE_OUTPUT_PASSWORD:-default}"
 
 # Prepare PrettyDump if needed
 "${ROOT_DIR}/scripts/prepare-pretty-dump.sh" >/dev/null 2>&1

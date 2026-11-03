@@ -2,7 +2,7 @@ package com.solace.schemavalidator.config;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.solace.schemavalidator.registry.ArtifactReference;
 import com.solace.schemavalidator.registry.CachingSchemaRegistryClient;
 import com.solace.schemavalidator.registry.HttpSchemaRegistryClient;

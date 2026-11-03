@@ -45,6 +45,9 @@ class AvroSchemaValidatorFactoryTest {
 
         assertThat(validator.validate(validPayload()).valid()).isTrue();
         assertThat(validator.validate(new byte[]{0x01, 0x02, 0x03}).valid()).isFalse();
+        byte[] valid = validPayload();
+        byte[] trailing = java.util.Arrays.copyOf(valid, valid.length + 1);
+        assertThat(validator.validate(trailing).valid()).isFalse();
     }
 
     private byte[] validPayload() throws Exception {

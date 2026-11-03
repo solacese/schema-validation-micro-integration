@@ -8,8 +8,22 @@ import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.*;
 
 class SchemaBundleLoaderTest {
+
+    @Test
+    void rejectsCyclicRegistryReferencesWithoutOverflowing() {
+        SchemaRegistryClient client = mock(SchemaRegistryClient.class);
+        when(client.getVersionMetadata("test", "root", "1"))
+            .thenReturn(new SchemaVersionMetadata("test", "root", "1", ArtifactType.JSON));
+        when(client.getVersionReferences("test", "root", "1"))
+            .thenReturn(List.of(new ArtifactReference("test", "root", "1", "self.json")));
+        SchemaBundleLoader loader = new SchemaBundleLoader(client, Caffeine.newBuilder().build(), TestMeters.metrics());
+        assertThatThrownBy(() -> loader.load("test", "root", "1"))
+            .isInstanceOf(SchemaRegistryException.class).hasMessageContaining("Cyclic schema reference");
+    }
 
     @Test
     void recursivelyLoadsReferencesAndCachesBundle() {

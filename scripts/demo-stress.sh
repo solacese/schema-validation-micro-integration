@@ -8,7 +8,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SDKPERF="${ROOT_DIR}/performance/sdkperf-jcsmp-10.29.1/sdkperf_java.sh"
+SDKPERF="${SDKPERF_CMD:-${ROOT_DIR}/performance/sdkperf-jcsmp-${SDKPERF_VERSION:-10.29.1}/sdkperf_java.sh}"
 
 RATE="${1:-1000}"
 DURATION="${2:-60}"
@@ -23,7 +23,8 @@ if [[ ! -f "${ROOT_DIR}/.env" ]]; then
   echo "Missing .env — run ./scripts/demo-setup.sh first"
   exit 1
 fi
-set -a; source "${ROOT_DIR}/.env"; set +a
+source "${ROOT_DIR}/scripts/lib/env.sh"
+load_project_env
 
 # ── Check MI ──
 MI_CONTAINER="${MI_CONTAINER:-schema-validation-micro-integration}"
@@ -35,9 +36,8 @@ fi
 
 # ── Build SDKPerf connection URL ──
 build_sdkperf_url() {
-  local url="${SOLACE_INPUT_BROKER:-${URL}}"
-  url="${url//solace-broker/localhost}"
-  url="${url//55555/55554}"
+  local url="${SOLACE_INPUT_BROKER:-tcp://solace-broker:55555}"
+  url="$(host_smf_url "${url}")"
   if [[ "${url}" == wss://* ]]; then
     url="${url/wss:\/\//tcps://}"
     url="${url/:443/:55443}"
@@ -46,9 +46,9 @@ build_sdkperf_url() {
 }
 
 SDKPERF_URL=$(build_sdkperf_url)
-SDKPERF_VPN="${SOLACE_INPUT_VPN:-${VPN}}"
-SDKPERF_USER="${SOLACE_INPUT_USERNAME:-${USER}}"
-SDKPERF_PASS="${SOLACE_INPUT_PASSWORD:-${PWD}}"
+SDKPERF_VPN="${SOLACE_INPUT_VPN:-default}"
+SDKPERF_USER="${SOLACE_INPUT_USERNAME:-default}"
+SDKPERF_PASS="${SOLACE_INPUT_PASSWORD:-default}"
 
 # ── Check SDKPerf ──
 if [[ ! -x "${SDKPERF}" ]]; then

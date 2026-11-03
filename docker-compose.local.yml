@@ -4,7 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        BUILD_IMAGE: ${MI_BUILD_IMAGE:-maven:3.9.9-eclipse-temurin-17}
+        ARTIFACT_STAGE: ${MI_ARTIFACT_STAGE:-build}
+        BUILD_IMAGE: ${MI_BUILD_IMAGE:-maven:3.9.15-eclipse-temurin-17}
         RUNTIME_IMAGE: ${MI_RUNTIME_IMAGE:-eclipse-temurin:17-jre}
     image: schema-validation-micro-integration:local
     container_name: schema-validation-micro-integration
@@ -15,26 +16,32 @@ services:
       - .env
     environment:
       PORT: 8088
-      SOLACE_INPUT_BROKER: ${SOLACE_INPUT_BROKER:-${URL}}
-      SOLACE_INPUT_VPN: ${SOLACE_INPUT_VPN:-${VPN}}
-      SOLACE_INPUT_USERNAME: ${SOLACE_INPUT_USERNAME:-${USER}}
-      SOLACE_INPUT_PASSWORD: ${SOLACE_INPUT_PASSWORD:-${PWD}}
-      SOLACE_OUTPUT_BROKER: ${SOLACE_OUTPUT_BROKER:-${URL}}
-      SOLACE_OUTPUT_VPN: ${SOLACE_OUTPUT_VPN:-${VPN}}
-      SOLACE_OUTPUT_USERNAME: ${SOLACE_OUTPUT_USERNAME:-${USER}}
-      SOLACE_OUTPUT_PASSWORD: ${SOLACE_OUTPUT_PASSWORD:-${PWD}}
-      SOLACE_BROKER: ${SOLACE_INPUT_BROKER:-${URL}}
-      SOLACE_VPN: ${SOLACE_INPUT_VPN:-${VPN}}
+      SOLACE_INPUT_BROKER: ${SOLACE_INPUT_BROKER:-${URL:-tcp://solace-broker:55555}}
+      SOLACE_INPUT_VPN: ${SOLACE_INPUT_VPN:-${VPN:-default}}
+      SOLACE_INPUT_USERNAME: ${SOLACE_INPUT_USERNAME:-default}
+      SOLACE_INPUT_PASSWORD: ${SOLACE_INPUT_PASSWORD:-default}
+      SOLACE_OUTPUT_BROKER: ${SOLACE_OUTPUT_BROKER:-${SOLACE_INPUT_BROKER:-${URL:-tcp://solace-broker:55555}}}
+      SOLACE_OUTPUT_VPN: ${SOLACE_OUTPUT_VPN:-${SOLACE_INPUT_VPN:-${VPN:-default}}}
+      SOLACE_OUTPUT_USERNAME: ${SOLACE_OUTPUT_USERNAME:-${SOLACE_INPUT_USERNAME:-default}}
+      SOLACE_OUTPUT_PASSWORD: ${SOLACE_OUTPUT_PASSWORD:-${SOLACE_INPUT_PASSWORD:-default}}
+      SOLACE_BROKER: ${SOLACE_INPUT_BROKER:-${URL:-tcp://solace-broker:55555}}
+      SOLACE_VPN: ${SOLACE_INPUT_VPN:-${VPN:-default}}
       SCHEMA_REGISTRY_BASE_URL: ${SCHEMA_REGISTRY_BASE_URL:-http://schema-registry-backend:8080/apis/registry/v3}
       SCHEMA_REGISTRY_USERNAME: ${SCHEMA_REGISTRY_USERNAME:-sr-readonly}
       SCHEMA_REGISTRY_PASSWORD: ${SCHEMA_REGISTRY_PASSWORD:-roPassword}
       CONSUMER_CONCURRENCY: ${CONSUMER_CONCURRENCY:-8}
+      VALIDATED_TOPIC_TEMPLATE: "${VALIDATED_TOPIC_TEMPLATE:-{originalTopic}}"
+      REJECT_TOPIC_TEMPLATE: "${REJECT_TOPIC_TEMPLATE:-{originalTopic}}"
+      PROCESSING_ERROR_TOPIC_TEMPLATE: "${PROCESSING_ERROR_TOPIC_TEMPLATE:-{originalTopic}}"
+      OUTCOME_LABEL_VALIDATED: "${OUTCOME_LABEL_VALIDATED:-valid}"
+      OUTCOME_LABEL_REJECT: "${OUTCOME_LABEL_REJECT:-invalid}"
+      OUTCOME_LABEL_PROCESSING_ERROR: "${OUTCOME_LABEL_PROCESSING_ERROR:-error}"
       PARTITION_COUNT: ${PARTITION_COUNT:-0}
-      SCHEMA_REGISTRY_REQUEST_TIMEOUT: 1500ms
-      REGISTRY_LOOKUP_TTL: 120m
-      MAX_REGISTRY_CACHE_ENTRIES: 5000
-      MAX_SCHEMA_CACHE_ENTRIES: 5000
-      MAX_VALIDATOR_CACHE_ENTRIES: 5000
+      SCHEMA_REGISTRY_REQUEST_TIMEOUT: ${SCHEMA_REGISTRY_REQUEST_TIMEOUT:-1500ms}
+      REGISTRY_LOOKUP_TTL: ${REGISTRY_LOOKUP_TTL:-120m}
+      MAX_REGISTRY_CACHE_ENTRIES: ${MAX_REGISTRY_CACHE_ENTRIES:-5000}
+      MAX_SCHEMA_CACHE_ENTRIES: ${MAX_SCHEMA_CACHE_ENTRIES:-5000}
+      MAX_VALIDATOR_CACHE_ENTRIES: ${MAX_VALIDATOR_CACHE_ENTRIES:-5000}
       JAVA_TOOL_OPTIONS: ${JAVA_TOOL_OPTIONS:--XX:InitialRAMPercentage=25 -XX:MaxRAMPercentage=75 -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+ExitOnOutOfMemoryError -Djava.security.egd=file:/dev/./urandom}
     volumes:
       - ./config:/app/config:ro
@@ -59,13 +66,8 @@ services:
       start_period: 45s
     networks:
       - default
-      - registry
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     restart: unless-stopped
 
 networks:
-  registry:
-    name: schema-micro-integration_default
-    external: true
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-schema-validation-mi}_default

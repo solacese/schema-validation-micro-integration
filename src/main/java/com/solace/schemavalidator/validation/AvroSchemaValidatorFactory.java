@@ -31,10 +31,15 @@ public class AvroSchemaValidatorFactory implements ValidatorFactory {
         if (rootSchema == null) {
             throw new IllegalStateException("Missing parsed root Avro schema");
         }
-        GenericDatumReader<Object> reader = new GenericDatumReader<>(rootSchema);
         return payload -> {
             try {
-                reader.read(null, DecoderFactory.get().binaryDecoder(new ByteArrayInputStream(payload), null));
+                // Datum readers hold mutable decoding state; do not share across consumers.
+                GenericDatumReader<Object> reader = new GenericDatumReader<>(rootSchema);
+                var decoder = DecoderFactory.get().binaryDecoder(new ByteArrayInputStream(payload), null);
+                reader.read(null, decoder);
+                if (!decoder.isEnd()) {
+                    return ValidationOutcome.failure("Avro payload contains trailing bytes after the datum");
+                }
                 return ValidationOutcome.success();
             } catch (Exception ex) {
                 return ValidationOutcome.failure(ex.getMessage());

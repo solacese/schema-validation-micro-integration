@@ -11,6 +11,11 @@
 /target
 /.flattened-pom.xml
 /.runtime
+/dist/
+/lib/
 /performance/sdkperf-jcsmp-*/
 /performance/*.whl
 /email/
+
+/schema-registry-v*/
+**/__pycache__/

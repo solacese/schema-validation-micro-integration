@@ -1,6 +1,6 @@
 services:
   solace:
-    image: solace/solace-pubsub-standard:latest
+    image: ${SOLACE_BROKER_IMAGE:-solace/solace-pubsub-standard:latest}
     container_name: solace-broker
     hostname: solace-broker
     shm_size: 1g
@@ -10,7 +10,7 @@ services:
         hard: 1048576
     ports:
       - "8080:8080"     # SEMP management
-      - "55554:55555"   # SMF (plain TCP)
+      - "${BROKER_SMF_HOST_PORT:-55554}:55555"   # SMF (plain TCP)
       - "55443:55443"   # SMF over TLS
       - "1883:1883"     # MQTT
       - "8883:8883"     # MQTT over TLS
@@ -23,3 +23,7 @@ services:
       username_admin_password: admin
       system_scaling_maxconnectioncount: 100
     restart: unless-stopped
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-schema-validation-mi}_default

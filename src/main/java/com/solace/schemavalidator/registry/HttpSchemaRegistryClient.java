@@ -1,9 +1,9 @@
 package com.solace.schemavalidator.registry;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.solace.schemavalidator.config.AppProperties;
 import com.solace.schemavalidator.resolution.ArtifactType;
 import java.io.IOException;
@@ -14,6 +14,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -50,7 +51,26 @@ public class HttpSchemaRegistryClient implements SchemaRegistryClient {
 
     @Override
     public List<SchemaVersionSummary> getArtifactVersions(String groupId, String artifactId) {
-        JsonNode node = readJson(get(path("/groups/%s/artifacts/%s/versions", groupId, artifactId)));
+        // v3 lists are paginated. Ask for creation order, not a semantic version sort:
+        // registry version identifiers may be arbitrary strings or branch names.
+        List<SchemaVersionSummary> result = new ArrayList<>();
+        int offset = 0;
+        while (true) {
+            JsonNode node = readJson(get(path("/groups/%s/artifacts/%s/versions", groupId, artifactId)
+                + "?limit=100&offset=" + offset + "&order=asc&orderby=createdOn"));
+            List<SchemaVersionSummary> page = decodeVersions(node, groupId, artifactId);
+            result.addAll(page);
+            offset += page.size();
+            if (offset >= node.path("count").asInt(offset)) {
+                return List.copyOf(result);
+            }
+            if (page.isEmpty()) {
+                throw new SchemaRegistryException("Schema Registry returned an empty page before the version count was reached");
+            }
+        }
+    }
+
+    private List<SchemaVersionSummary> decodeVersions(JsonNode node, String groupId, String artifactId) {
         JsonNode versionsNode = node.path("versions");
         if (!versionsNode.isArray()) {
             throw new SchemaRegistryException("Schema Registry version list response was missing the versions array");
@@ -81,7 +101,7 @@ public class HttpSchemaRegistryClient implements SchemaRegistryClient {
         JsonNode node = readJson(get(path("/groups/%s/artifacts/%s/versions/%s/references", groupId, artifactId, versionExpression)));
         try {
             return objectMapper.readerForListOf(ArtifactReference.class).readValue(node);
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             throw new SchemaRegistryException("Failed to decode schema references", e);
         }
     }
@@ -94,7 +114,7 @@ public class HttpSchemaRegistryClient implements SchemaRegistryClient {
 
     private HttpRequest get(String path) {
         return HttpRequest.newBuilder()
-            .uri(URI.create(properties.getBaseUrl() + path))
+            .uri(URI.create(properties.getBaseUrl().replaceAll("/+$", "") + path))
             .timeout(properties.getRequestTimeout())
             .header("Authorization", authorizationHeader)
             .header("Accept", "application/json")
@@ -106,7 +126,7 @@ public class HttpSchemaRegistryClient implements SchemaRegistryClient {
         HttpResponse<String> response = execute(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
         try {
             return objectMapper.readTree(response.body());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new SchemaRegistryException("Failed to parse registry response", e);
         }
     }
@@ -135,6 +155,6 @@ public class HttpSchemaRegistryClient implements SchemaRegistryClient {
     }
 
     private String encode(String value) {
-        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+        return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
     }
 }

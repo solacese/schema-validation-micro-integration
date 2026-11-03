@@ -1,13 +1,13 @@
 services:
   schema-registry-postgres:
-    image: postgres:17.2
+    image: ${REGISTRY_POSTGRES_IMAGE:-postgres:17}
     container_name: schema-registry-postgres
     environment:
       POSTGRES_DB: solace-registry
       POSTGRES_USER: solace-registry
       POSTGRES_PASSWORD: password
     ports:
-      - "${REGISTRY_POSTGRES_HOST_PORT:-15432}:5432"
+      - "127.0.0.1:${REGISTRY_POSTGRES_HOST_PORT:-15432}:5432"
     volumes:
       - schema_registry_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -17,27 +17,27 @@ services:
       retries: 20
 
   schema-registry-idp:
-    image: node:22-alpine
+    image: ${REGISTRY_IDP_RUNTIME_IMAGE:-node:22-alpine}
     container_name: schema-registry-idp
     user: node
     working_dir: /home/node/app
     command: ["node", "bundle.js"]
     environment:
-      KEY: "${IDP_KEY:-local-dev-signing-key}"
+      KEY: "${IDP_KEY:?Run scripts/start-local-registry-native.sh to load the release signing key}"
       NODE_ENV: "production"
-      IDP_URL: "${IDP_URL:-http://localhost:13000}"
+      IDP_URL: "${IDP_URL:-http://localhost:${IDP_HOST_PORT:-13000}}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:18888,http://localhost:18081}"
       REDIRECT_URIS: "${REDIRECT_URIS:-http://localhost:18888/explore}"
       API_SECRET: "${API_SECRET:-apiSecret}"
       DEVELOPER_PASSWORD: "${DEVELOPER_PASSWORD:-devPassword}"
       READONLY_PASSWORD: "${READONLY_PASSWORD:-roPassword}"
     ports:
-      - "${IDP_HOST_PORT:-13000}:3000"
+      - "127.0.0.1:${IDP_HOST_PORT:-13000}:3000"
     volumes:
-      - ./.runtime/schema-registry/oidc-provider/dist:/home/node/app:ro
+      - ${SCHEMA_REGISTRY_RUNTIME_DIR:-./.runtime/schema-registry/1.1.2}/compose-files/oidc-provider/dist:/home/node/app:ro
 
   schema-registry-backend:
-    image: eclipse-temurin:17-jre
+    image: ${REGISTRY_RUNTIME_IMAGE:-eclipse-temurin:17-jre}
     container_name: schema-registry-backend
     working_dir: /deployments
     command:
@@ -45,23 +45,27 @@ services:
       - -Djava.util.logging.manager=org.jboss.logmanager.LogManager
       - -Dquarkus.http.host=0.0.0.0
       - -jar
-      - /deployments/solace-schema-registry-3.0.7-SNAPSHOT-runner.jar
+      - /deployments/registry-runner.jar
     environment:
       QUARKUS_HTTP_PORT: 8080
-      REGISTRY_LOG_LEVEL: "DEBUG"
+      REGISTRY_LOG_LEVEL: "INFO"
       QUARKUS_HTTP_CORS_ORIGINS: "${QUARKUS_HTTP_CORS_ORIGINS:-http://localhost:18888}"
       APICURIO_DATASOURCE_URL: "jdbc:postgresql://schema-registry-postgres:5432/solace-registry"
       APICURIO_DATASOURCE_USERNAME: "solace-registry"
       APICURIO_DATASOURCE_PASSWORD: "password"
+      APICURIO_AUTH_ROLE_BASED_AUTHORIZATION: "true"
+      QUARKUS_OIDC_TENANT_ENABLED: "true"
       APICURIO_STORAGE_SQL_KIND: "postgresql"
       APICURIO_AUTHN_BASIC_CLIENT_CREDENTIALS_ENABLED: "true"
       QUARKUS_OIDC_AUTH_SERVER_URL: "http://schema-registry-idp:3000"
       QUARKUS_OIDC_TOKEN_PATH: "http://schema-registry-idp:3000/token"
       QUARKUS_OIDC_CLIENT_ID: "sr-api"
+      QUARKUS_OIDC_CREDENTIALS_SECRET: "${API_SECRET:-apiSecret}"
+      QUARKUS_OIDC_ROLES_ROLE_CLAIM_PATH: "groups"
     ports:
-      - "${REGISTRY_API_HOST_HTTP_PORT:-18081}:8080"
+      - "127.0.0.1:${REGISTRY_API_HOST_HTTP_PORT:-18081}:8080"
     volumes:
-      - ./.runtime/registry-backend/deployments:/deployments
+      - ${SCHEMA_REGISTRY_RUNTIME_DIR:-./.runtime/schema-registry/1.1.2}/backend/deployments:/deployments:ro
     depends_on:
       schema-registry-postgres:
         condition: service_healthy
@@ -70,3 +74,7 @@ services:
 
 volumes:
   schema_registry_postgres_data:
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME:-schema-validation-mi}_default

@@ -29,8 +29,8 @@ spring:
               java:
                 host: ${SOLACE_INPUT_BROKER:${URL:}}
                 msg-vpn: ${SOLACE_INPUT_VPN:${VPN:}}
-                client-username: ${SOLACE_INPUT_USERNAME:${USER:}}
-                client-password: ${SOLACE_INPUT_PASSWORD:${PWD:}}
+                client-username: ${SOLACE_INPUT_USERNAME:default}
+                client-password: ${SOLACE_INPUT_PASSWORD:default}
                 connect-retries: -1
                 reconnect-retries: -1
                 api-properties:
@@ -40,10 +40,10 @@ spring:
           environment:
             solace:
               java:
-                host: ${SOLACE_OUTPUT_BROKER:${URL:}}
-                msg-vpn: ${SOLACE_OUTPUT_VPN:${VPN:}}
-                client-username: ${SOLACE_OUTPUT_USERNAME:${USER:}}
-                client-password: ${SOLACE_OUTPUT_PASSWORD:${PWD:}}
+                host: ${SOLACE_OUTPUT_BROKER:${SOLACE_INPUT_BROKER:${URL:}}}
+                msg-vpn: ${SOLACE_OUTPUT_VPN:${SOLACE_INPUT_VPN:${VPN:default}}}
+                client-username: ${SOLACE_OUTPUT_USERNAME:${SOLACE_INPUT_USERNAME:default}}
+                client-password: ${SOLACE_OUTPUT_PASSWORD:${SOLACE_INPUT_PASSWORD:default}}
                 connect-retries: -1
                 reconnect-retries: -1
                 api-properties:
@@ -257,28 +257,6 @@ app:
       artifact-type: JSON
       version-strategy:
         type: LATEST_ENABLED
-
-# Solace connector framework (reads from input binder)
-solace:
-  java:
-    host: ${SOLACE_INPUT_BROKER:${URL:}}
-    msg-vpn: ${SOLACE_INPUT_VPN:${VPN:}}
-    client-username: ${SOLACE_INPUT_USERNAME:${USER:}}
-    client-password: ${SOLACE_INPUT_PASSWORD:${PWD:}}
-    connect-retries: -1
-    reconnect-retries: -1
-    api-properties:
-      pub_ack_window_size: 255
-  connector:
-    security:
-      enabled: false
-    workflows:
-      0:
-        enabled: true
-        input-bindings:
-          - schemaValidationProcessor-in-0
-        output-bindings:
-          - schemaValidationResults-out-0
 
 management:
   endpoints:
