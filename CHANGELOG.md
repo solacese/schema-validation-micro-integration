@@ -4,6 +4,7 @@
 
 - Fix `demo-publish.sh all` and `unmapped` on macOS Bash 3.2: publishing without schema headers no longer fails with an unbound array error.
 - Check headerless and schema-selected publishing through both REST and SDKPerf in regression tests.
+- Run the helper regression tests on macOS system Bash as well as Linux in CI.
 - Clarify that validation logs arrive asynchronously after the broker accepts a publish.
 - Keep the release downloads and Word guide aligned with the corrected demo script.
 

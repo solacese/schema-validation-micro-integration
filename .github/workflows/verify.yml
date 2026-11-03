@@ -5,6 +5,14 @@ on:
 permissions:
   contents: read
 jobs:
+  macos-scripts:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Verify helpers with macOS system Bash
+        run: |
+          /bin/bash --version
+          python3 -m unittest discover -s scripts/tests -v
   verify:
     runs-on: ubuntu-latest
     strategy:
