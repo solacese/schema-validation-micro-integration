@@ -22,7 +22,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <avro.version>1.12.2</avro.version>
         <caffeine.version>3.3.1</caffeine.version>
-        <json-schema-validator.version>3.0.8</json-schema-validator.version>
+        <json-schema-validator.version>3.0.9</json-schema-validator.version>
         <wiremock.version>3.13.2</wiremock.version>
         <wire.version>7.1.2</wire.version>
         <kotlin.version>2.4.21</kotlin.version>
